@@ -1,0 +1,28 @@
+Issue Type,Summary,Description,Parent Key,Status,Due Date
+Epic,AWS Implementation,A dummy initiative for AWS implementation,,To Do,
+Epic,AWS Networking Setup,Configure VPCs, subnets, and networking,AWS Implementation,To Do,
+Epic,AWS Compute Setup,Launch EC2 instances and configure compute resources,AWS Implementation,In Progress,
+Epic,AWS Security & IAM,Set up security, IAM roles, and permissions,AWS Implementation,To Do,
+Story,Create VPC,Set up a new VPC for project,AWS Networking Setup,To Do,2025-12-10
+Story,Configure Subnets,Define public and private subnets,AWS Networking Setup,In Progress,2025-12-15
+Story,Setup Security Groups,Create security groups and rules,AWS Networking Setup,Done,2025-09-25
+Task,Document Network Setup,Write documentation for VPC and subnets,AWS Networking Setup,To Do,2025-12-12
+Story,Launch EC2 Instances,Deploy EC2 instances for application servers,AWS Compute Setup,To Do,2025-12-05
+Story,Configure Auto Scaling,Enable auto scaling for EC2 instances,AWS Compute Setup,Blocked,2025-11-30
+Story,Setup IAM Roles,Create IAM roles for EC2 instances,AWS Compute Setup,Done,2025-09-28
+Task,Create EC2 AMI,Build a custom AMI for EC2 instances,AWS Compute Setup,In Progress,2025-12-08
+Story,Setup Security Policies,Define IAM policies for project,AWS Security & IAM,To Do,2025-12-15
+Story,Enable CloudTrail,Set up CloudTrail for auditing,AWS Security & IAM,Blocked,2025-11-28
+Story,Configure S3 Bucket Policies,Secure S3 buckets with proper permissions,AWS Security & IAM,Done,2025-09-29
+Task,Audit IAM Users,Review IAM users and permissions,AWS Security & IAM,In Progress,2025-12-05
+Story,Setup MFA for Users,Enable Multi-Factor Authentication for all IAM users,AWS Security & IAM,In Progress,2025-12-05
+Story,Review Security Groups,Audit security groups for compliance,AWS Security & IAM,To Do,2025-12-18
+Task,Create Security Runbook,Document all security setup and policies,AWS Security & IAM,To Do,2025-12-20
+Story,Configure VPN Connections,Setup VPN tunnels for secure access,AWS Networking Setup,To Do,2025-12-22
+Task,Test Network Latency,Measure latency between subnets,AWS Networking Setup,In Progress,2025-12-15
+Story,Deploy Load Balancer,Set up load balancer for EC2 instances,AWS Compute Setup,To Do,2025-12-10
+Task,Monitor EC2 Performance,Set up CloudWatch monitoring for EC2,AWS Compute Setup,In Progress,2025-12-12
+Story,Configure Backup Policies,Create backup plan for critical data,AWS Compute Setup,Blocked,2025-11-29
+Task,Update Security Groups,Add missing firewall rules,AWS Security & IAM,To Do,2025-12-18
+Story,Conduct Penetration Test,Run security tests on setup,AWS Security & IAM,To Do,2025-12-20
+Task,Prepare Deployment Guide,Document step-by-step deployment,AWS Compute Setup,To Do,2025-12-18
