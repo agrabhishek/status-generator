@@ -30,8 +30,14 @@ except ImportError:
     EXCEL_AVAILABLE = False
 
 # 2. UTILITY FUNCTIONS
-def build_jql(spaces=None, labels=None, time_period=None, time_field='created'):
-    """Build JQL with proper quoting (no ORDER BY - handled by jql() method)"""
+def build_jql(spaces=None, labels=None, time_period=None, time_field='resolutiondate'):
+    """
+    Build JQL with proper quoting (no ORDER BY - handled by jql() method)
+    
+    IMPORTANT: 
+    - For achievements: use time_field='resolutiondate' (when work was COMPLETED)
+    - For next steps: use time_field='duedate' (when work is DUE)
+    """
     jql_parts = []
     if spaces:
         space_list = [s.strip().strip("'\"") for s in spaces.split(',')]
@@ -260,7 +266,7 @@ def get_llm_summary(llm_provider, api_key, prompt):
 # 8. REPORT GENERATOR (ENHANCED)
 def generate_report(issues, persona, llm_provider, api_key, initiative_name, current_period, jira_client, spaces, labels):
     if not issues:
-        return f"❌ No issues found for {initiative_name}."
+        return f"❌ No issues found for {initiative_name}.", pd.DataFrame(), pd.DataFrame()
     
     data = []
     issues_dict = {}
@@ -325,7 +331,7 @@ def generate_report(issues, persona, llm_provider, api_key, initiative_name, cur
     
     prior_summary = f"{len(prior_keys)} items completed prior to this period." if prior_keys else "No prior progress."
     
-    # Build hierarchy
+    # Build hierarchy based on persona
     def build_hierarchical_text(issues_dict, roots, indent=''):
         text = ''
         for key in roots:
@@ -335,27 +341,67 @@ def generate_report(issues, persona, llm_provider, api_key, initiative_name, cur
             text += build_hierarchical_text(issues_dict, subtasks, indent + '  ')
         return text
     
-    hierarchy_text = build_hierarchical_text(issues_dict, roots)
+    # Persona-specific formatting
+    if persona == 'team_lead':
+        hierarchy_text = build_hierarchical_text(issues_dict, roots)
+    elif persona == 'manager':
+        # Manager: High-level summary paragraph
+        completed_summaries = [issues_dict[k]['Summary'] for k in achieved_keys[:10]]
+        hierarchy_text = f"Completed {len(achieved_keys)} tickets this period. Key accomplishments include: " + \
+                        ", ".join(completed_summaries[:5]) + \
+                        (f", and {len(achieved_keys)-5} other items" if len(achieved_keys) > 5 else ".")
+    elif persona == 'group_manager':
+        # Group Manager: Metrics-focused summary
+        hierarchy_text = f"Team completed {len(achieved_keys)} of {len(df)} tickets ({len(achieved_keys)/len(df)*100:.0f}% completion rate). " + \
+                        f"Major deliverables: {', '.join([issues_dict[k]['Summary'][:40] for k in roots[:3]])}."
+    elif persona == 'cto':
+        # CTO: Executive summary paragraph
+        hierarchy_text = f"Initiative delivered {len(achieved_keys)} items. " + \
+                        f"Primary outcomes: {', '.join([issues_dict[k]['Summary'][:50] for k in roots[:2]])}. " + \
+                        f"Team velocity: {len(achieved_keys)} items completed in period."
+    else:
+        hierarchy_text = build_hierarchical_text(issues_dict, roots)
     
-    # AI Summary
+    # AI Summary with persona-specific prompts
     achievements_summary = hierarchy_text
     if api_key and achieved_keys and llm_provider != "None":
-        prompt = f"Summarize these completed Jira tickets for {persona}:\n{hierarchy_text}"
+        if persona == 'team_lead':
+            prompt = f"Summarize these completed Jira tickets for a team lead (technical details matter):\n{hierarchy_text}"
+        elif persona == 'manager':
+            prompt = f"Write a concise executive paragraph summarizing these achievements for a manager (focus on outcomes, not technical details):\n{hierarchy_text}"
+        elif persona == 'group_manager':
+            prompt = f"Write a strategic summary for a group manager highlighting business impact and team performance:\n{hierarchy_text}"
+        elif persona == 'cto':
+            prompt = f"Write a high-level executive summary for CTO highlighting strategic value and key deliverables:\n{hierarchy_text}"
+        else:
+            prompt = f"Summarize these completed Jira tickets:\n{hierarchy_text}"
+            
         ai_summary = get_llm_summary(llm_provider, api_key, prompt)
-        achievements_summary += f"\n\n📖 AI SUMMARY:\n{ai_summary}"
+        
+        # For manager/CTO, replace the list with AI summary
+        if persona in ['manager', 'group_manager', 'cto']:
+            achievements_summary = f"📖 {ai_summary}"
+        else:
+            achievements_summary += f"\n\n📖 AI SUMMARY:\n{ai_summary}"
     
-    # Next steps
+    # Next steps - USE DUE DATE for forward-looking work
     next_period = get_next_period_dates(current_period)
-    next_jql = build_jql(spaces, labels, next_period)
+    next_jql = build_jql(spaces, labels, next_period, time_field='duedate')
     next_issues = fetch_issues(jira_client, next_jql)
-    next_df = pd.DataFrame([{
-        'Key': i.get('key'),
-        'Summary': i.get('fields', {}).get('summary', 'N/A'),
-        'Status': i.get('fields', {}).get('status', {}).get('name', 'N/A') if i.get('fields', {}).get('status') else 'N/A',
-        'Priority': (i.get('fields', {}).get('priority') or {}).get('name', 'N/A')
-    } for i in next_issues])
     
-    upcoming = next_df[next_df['Status'].isin(['To Do', 'In Progress'])]
+    if next_issues:
+        next_df = pd.DataFrame([{
+            'Key': i.get('key'),
+            'Summary': i.get('fields', {}).get('summary', 'N/A'),
+            'Status': i.get('fields', {}).get('status', {}).get('name', 'N/A') if i.get('fields', {}).get('status') else 'N/A',
+            'Priority': (i.get('fields', {}).get('priority') or {}).get('name', 'N/A')
+        } for i in next_issues])
+        
+        upcoming = next_df[next_df['Status'].isin(['To Do', 'In Progress'])]
+    else:
+        next_df = pd.DataFrame(columns=['Key', 'Summary', 'Status', 'Priority'])
+        upcoming = pd.DataFrame()
+    
     next_steps = "📋 **NEXT STEPS**: No tickets scheduled." if len(upcoming) == 0 else \
         f"📋 **NEXT STEPS** ({len(upcoming)} tickets):\n" + "\n".join(
             [f"• {row['Key']}: {row['Summary'][:50]}... ({row['Priority']})" for _, row in upcoming.head(5).iterrows()]
@@ -370,14 +416,16 @@ def generate_report(issues, persona, llm_provider, api_key, initiative_name, cur
 {overview}
 {prior_summary}
 
-**2. COMPLETED THIS PERIOD**
+**2. BUSINESS IMPACT - DELIVERED THIS PERIOD**
+(Based on resolution date: {current_period})
 {achievements_summary}
 
 **3. METRICS**
-Total: {len(df)} | Completed: {len(achieved_df)} ({len(achieved_df)/len(df)*100:.0f}%)
+Total Issues: {len(df)} | Completed: {len(achieved_df)} ({len(achieved_df)/len(df)*100:.0f}%)
 Overdue: {overdue_count}
 
-**4. NEXT STEPS**
+**4. BUSINESS IMPACT - FORWARD LOOKING**
+(Based on due dates in upcoming period)
 {next_steps}
 """
     
@@ -509,6 +557,10 @@ labels = st.text_input("Labels (optional)", key="labels")
 persona = st.selectbox("Persona", ["Team Lead", "Manager", "Group Manager", "CTO"], key="persona")
 llm_provider = st.selectbox("LLM Provider", ["OpenAI", "xAI", "Gemini", "None"], key="llm_provider")
 llm_key = st.text_input("LLM API Key (if using AI)", type="password", key="llm_key")
+
+# Period selection with clear explanation
+st.markdown("### 📅 Reporting Period")
+st.info("💡 **Achievements** are filtered by resolution date (when completed). **Next steps** are filtered by due date.")
 period = st.selectbox("Period", ["last_week", "last_month", "Custom"], key="period")
 
 if period == "Custom":
@@ -613,10 +665,11 @@ if st.button("📄 Generate Report"):
                 else:
                     st.success(f"✅ Project has {len(test_issues)} total issues")
             
-            # Now try with date filter
+            # Now try with date filter - USE RESOLUTION DATE for achievements
             with st.spinner("Fetching issues with filters..."):
-                jql = build_jql(spaces, labels, period)
+                jql = build_jql(spaces, labels, period, time_field='resolutiondate')
                 st.info(f"🔍 JQL: `{jql}`")
+                st.info("💡 Filtering by resolution date (when work was COMPLETED)")
                 issues = fetch_issues(jira_client, jql, debug=True)
                 
                 if not issues:
