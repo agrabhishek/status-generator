@@ -3,3 +3,4 @@ pandas
 atlassian-python-api
 requests
 openpyxl
+openai
