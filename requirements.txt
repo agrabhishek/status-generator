@@ -3,5 +3,4 @@ pandas
 atlassian-python-api
 requests
 openpyxl
-os
 io
