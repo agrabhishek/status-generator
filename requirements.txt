@@ -4,3 +4,4 @@ atlassian-python-api
 requests
 openpyxl
 openai
+reportlab
