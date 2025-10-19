@@ -619,7 +619,7 @@ if use_default_jira and CREDENTIALS['jira_url']:
     jira_token = CREDENTIALS['jira_token']
     
     # Default project space
-    spaces = st.text_input("Jira Spaces*", value="AWS", key="spaces")
+    spaces = st.text_input("Jira Spaces*", value="AWS Migration", key="spaces")
     
 else:
     # User provides their own Jira
@@ -697,9 +697,15 @@ if llm_provider == "Groq (Free Tier)":
             st.error("❌ Could not fetch Groq models. Check configuration.")
             st.stop()
         
+        # Set default to kimi-k2-instruct if available
+        default_index = 0
+        if "moonshot-ai/kimi-k2-instruct" in available_models:
+            default_index = available_models.index("moonshot-ai/kimi-k2-instruct")
+        
         selected_groq_model = st.selectbox(
             "Select Model",
             available_models,
+            index=default_index,
             help="If you encounter rate limits, select a different model."
         )
         
@@ -726,66 +732,55 @@ if period == "Custom":
 # Validate inputs
 if st.button("📄 Generate Report"):
     if not all([initiative_name, url, email, jira_token, spaces]):
-        st.error("❌ Please fill all required fields marked with *")
+        st.error("❌ Please fill all required fields")
     else:
         try:
             # Authentication
-            with st.spinner("Authenticating with Jira..."):
-                st.info(f"🔗 Connecting to: {url}")
-                st.info(f"👤 Using: {email}")
+            with st.spinner("Connecting to Jira..."):
                 jira_client = Jira(url=url, username=email, password=jira_token, cloud=True)
                 
                 try:
                     myself = jira_client.myself()
-                    st.success(f"✅ AUTHENTICATED as: {myself.get('displayName')} ({myself.get('emailAddress')})")
                 except Exception as auth_error:
                     st.error(f"❌ Authentication failed: {auth_error}")
                     st.stop()
             
             # Fetch issues with resolution date filter
-            with st.spinner("Fetching completed work (by resolution date)..."):
+            with st.spinner("Fetching data..."):
                 jql = build_jql(spaces, labels, period, time_field='resolutiondate')
-                st.info(f"🔍 JQL: `{jql}`")
-                st.info("💡 Filtering by resolution date (when work was COMPLETED)")
                 issues = fetch_issues(jira_client, jql, debug=False)
                 
                 if not issues:
-                    st.warning("⚠️ No issues match your filters")
-                    st.info("💡 Try a wider date range or check if tickets have resolution dates")
-                else:
-                    st.success(f"✅ Found {len(issues)} matching issues!")
+                    st.warning("⚠️ No issues found matching your criteria")
+                    st.stop()
             
             # Generate report
-            if issues:
-                with st.spinner("Generating report..."):
-                    report, df, next_df = generate_report(
-                        issues, 
-                        persona.lower().replace(' ', '_'), 
-                        llm_provider, 
-                        llm_key, 
-                        initiative_name, 
-                        period, 
-                        jira_client, 
-                        spaces, 
-                        labels,
-                        groq_model=selected_groq_model
-                    )
-                    
-                    # Store in session state
-                    st.session_state['generated_report'] = report
-                    st.session_state['generated_df'] = df
-                    st.session_state['generated_next_df'] = next_df
-                    st.session_state['generated_initiative_name'] = initiative_name
-                    st.success("✅ Report generated!")
-                    
-                    # Check for rate limit warning in report
-                    if "⚠️ Rate limit hit" in report:
-                        st.warning("🔄 Rate limit detected! Please select a different Groq model and regenerate the report.")
+            with st.spinner("Generating report..."):
+                report, df, next_df = generate_report(
+                    issues, 
+                    persona.lower().replace(' ', '_'), 
+                    llm_provider, 
+                    llm_key, 
+                    initiative_name, 
+                    period, 
+                    jira_client, 
+                    spaces, 
+                    labels,
+                    groq_model=selected_groq_model
+                )
+                
+                # Store in session state
+                st.session_state['generated_report'] = report
+                st.session_state['generated_df'] = df
+                st.session_state['generated_next_df'] = next_df
+                st.session_state['generated_initiative_name'] = initiative_name
+                
+                # Check for rate limit warning in report
+                if "⚠️ Rate limit hit" in report:
+                    st.warning("Rate limit encountered. Please select a different model and try again.")
                     
         except Exception as e:
             st.error(f"❌ Error: {e}")
-            import traceback
-            st.code(traceback.format_exc())
 
 # Display report
 if 'generated_report' in st.session_state and st.session_state.generated_report:
@@ -830,34 +825,3 @@ if 'generated_report' in st.session_state and st.session_state.generated_report:
                 st.error(f"Excel export failed: {excel_error}")
         else:
             st.warning("Excel export unavailable. Install: pip install openpyxl")
-
-# Footer
-st.markdown("---")
-st.markdown("""
-### 📚 Setup Instructions
-
-**First-time setup:**
-1. Create `.streamlit/secrets.toml` file (see `.streamlit/secrets.toml.example`)
-2. Add your credentials:
-   ```toml
-   [jira]
-   email = "your-email@company.com"
-   api_token = "your-jira-api-token"
-   default_url = "https://yourcompany.atlassian.net"
-   
-   [groq]
-   api_key = "gsk_your-groq-api-key"
-   ```
-3. Get Groq API key (free): https://console.groq.com/keys
-4. Get Jira API token: https://id.atlassian.com/manage-profile/security/api-tokens
-
-**For Streamlit Cloud:**
-- Go to App Settings → Secrets
-- Paste the TOML content there
-- Never commit `.streamlit/secrets.toml` to GitHub!
-
-**Rate Limits:**
-- If you see "429 Too Many Requests", select a different Groq model
-- Free tier is generous but shared across users
-- Consider using your own OpenAI/xAI/Gemini key for unlimited access
-""")
