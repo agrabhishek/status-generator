@@ -607,7 +607,7 @@ if selected_preset != "None":
             st.session_state[k] = v
 
 # Main inputs
-initiative_name = st.text_input("Initiative / Epic Name*", key="initiative_name")
+initiative_name = st.text_input("Initiative / Epic Name* (Type AWS for test setup)", key="initiative_name")
 
 # Jira URL - User choice or default
 use_default_jira = st.checkbox("Use default Jira configuration", value=True if CREDENTIALS['jira_url'] else False)
@@ -619,7 +619,7 @@ if use_default_jira and CREDENTIALS['jira_url']:
     jira_token = CREDENTIALS['jira_token']
     
     # Default project space
-    spaces = st.text_input("Jira Spaces*", value="AWS Migration", key="spaces")
+    spaces = st.text_input("Jira Spaces*(Type AWS for test setup)", value="AWS Migration", key="spaces")
     
 else:
     # User provides their own Jira
