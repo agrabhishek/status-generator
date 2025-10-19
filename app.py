@@ -609,22 +609,68 @@ if selected_preset != "None":
 # Main inputs
 initiative_name = st.text_input("Initiative / Epic Name*", key="initiative_name")
 
-# Jira credentials from secrets
-if CREDENTIALS['jira_url']:
-    url = CREDENTIALS['jira_url']
-    st.success(f"✅ Using pre-configured Jira URL: {url}")
-else:
-    url = st.text_input("Jira URL*", key="url", placeholder="https://yourcompany.atlassian.net")
+# Jira URL - User choice or default
+use_default_jira = st.checkbox("Use default Jira configuration", value=True if CREDENTIALS['jira_url'] else False)
 
-if CREDENTIALS['jira_email']:
-    st.success(f"✅ Using pre-configured Jira account: {CREDENTIALS['jira_email']}")
+if use_default_jira and CREDENTIALS['jira_url']:
+    # Use pre-configured Jira
+    url = CREDENTIALS['jira_url']
     email = CREDENTIALS['jira_email']
     jira_token = CREDENTIALS['jira_token']
+    
+    # Default project space
+    spaces = st.text_input("Jira Spaces*", value="AWS Migration", key="spaces")
+    
 else:
-    st.error("⚠️ Jira credentials not configured. Please set up secrets. See README.")
-    st.stop()
+    # User provides their own Jira
+    url = st.text_input("Jira URL*", key="url", placeholder="https://yourcompany.atlassian.net")
+    email = st.text_input("Jira Email*", key="email")
+    jira_token = st.text_input("Jira API Token*", type="password", key="jira_token")
+    
+    # Fetch and allow project selection
+    if url and email and jira_token:
+        if st.button("🔍 Discover Projects"):
+            try:
+                with st.spinner("Fetching projects..."):
+                    temp_jira = Jira(url=url, username=email, password=jira_token, cloud=True)
+                    try:
+                        response = temp_jira.get('rest/api/3/project/search')
+                        projects = response.get('values', [])
+                        if projects:
+                            project_info = {p['key']: p.get('name', 'Unknown') for p in projects}
+                            st.session_state['available_projects'] = list(project_info.keys())
+                            st.session_state['project_names'] = project_info
+                    except:
+                        result = temp_jira.jql('assignee = currentUser() OR reporter = currentUser()', limit=100)
+                        issues = result.get('issues', [])
+                        unique_projects = {}
+                        for issue in issues:
+                            proj = issue.get('fields', {}).get('project', {})
+                            if proj:
+                                key = proj.get('key')
+                                name = proj.get('name', 'Unknown')
+                                unique_projects[key] = name
+                        if unique_projects:
+                            st.session_state['available_projects'] = list(unique_projects.keys())
+                            st.session_state['project_names'] = unique_projects
+            except Exception as e:
+                st.error(f"Failed to fetch projects: {e}")
+        
+        # Multi-select for projects
+        if 'available_projects' in st.session_state:
+            selected_projects = st.multiselect(
+                "Select Jira Projects*",
+                st.session_state['available_projects'],
+                format_func=lambda x: f"{x} - {st.session_state['project_names'].get(x, 'Unknown')}"
+            )
+            spaces = ','.join(selected_projects) if selected_projects else None
+        else:
+            spaces = st.text_input("Jira Spaces* (comma-separated)", key="spaces_manual", 
+                                  placeholder="AWS,CLOUD", 
+                                  help="Click 'Discover Projects' above to see available options")
+    else:
+        spaces = None
 
-spaces = st.text_input("Jira Spaces* (comma-separated)", key="spaces", placeholder="AWS,CLOUD")
 labels = st.text_input("Labels (optional)", key="labels")
 persona = st.selectbox("Persona", ["Team Lead", "Manager", "Group Manager", "CTO"], key="persona")
 
@@ -640,40 +686,34 @@ selected_groq_model = None
 
 if llm_provider == "Groq (Free Tier)":
     if not CREDENTIALS['groq_api_key']:
-        st.error("⚠️ Groq API key not configured. Please set up secrets. See README.")
+        st.error("⚠️ Groq API key not configured. Please set up secrets.")
         st.stop()
     else:
-        st.success("✅ Using pre-configured Groq API key")
-        
         # Fetch available models dynamically
-        with st.spinner("Fetching Groq models..."):
+        with st.spinner("Loading models..."):
             available_models = fetch_groq_models(CREDENTIALS['groq_api_key'])
         
         if not available_models:
-            st.error("❌ Could not fetch Groq models. Check API key or network connection.")
+            st.error("❌ Could not fetch Groq models. Check configuration.")
             st.stop()
         
         selected_groq_model = st.selectbox(
-            "Select Groq Model",
+            "Select Model",
             available_models,
-            help="Free tier models with generous rate limits. If you hit a 429 error, select a different model."
+            help="If you encounter rate limits, select a different model."
         )
         
-        st.info(f"💡 Selected: **{selected_groq_model}**")
         llm_key = CREDENTIALS['groq_api_key']
 
 elif llm_provider in ["OpenAI", "xAI", "Gemini"]:
     llm_key = st.text_input(
         f"{llm_provider} API Key", 
         type="password", 
-        key="user_llm_key",
-        help=f"Provide your own {llm_provider} API key"
+        key="user_llm_key"
     )
 
 # Period selection
-st.markdown("### 📅 Reporting Period")
-st.info("💡 **Achievements** filtered by resolution date (when completed). **Next steps** filtered by due date.")
-period = st.selectbox("Period", ["last_week", "last_month", "Custom"], key="period")
+period = st.selectbox("Reporting Period", ["last_week", "last_month", "Custom"], key="period")
 
 if period == "Custom":
     col1, col2 = st.columns(2)
