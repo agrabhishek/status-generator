@@ -40,9 +40,12 @@ Additional requirements:
 Multi-LLM Integration: Provide options to use xAI, OpenAI, or Gemini for AI-powered summaries of completed work, with user-provided API keys for the selected provider.
 Export Options: Enable export of reports to PDF (professional formatting with headers/sections) and Excel (multiple sheets for issues, next steps, and context).
 Save and Load Criteria: Users must be able to save input criteria (e.g., initiative name, filters, persona, LLM choice) as presets and reload them for quick reuse in future sessions.
-############################################
+
+
+
+###############################
 Prompt used for test jira setup:
-############################################
+###############################
 
 You are a highly skilled Test Engineer specializing in designing realistic synthetic Jira ticket datasets to validate an AI app that generates executive reports from Jira issues.
 
@@ -147,5 +150,6 @@ You must:
 - Return **Narrative**, **CSV Table**, and **Audit/Counter-Case/Reconciliation** — in that order.
 
 If the user provides no name, use the default **Enterprise Cloud Migration**.
-
+###############################################################
+###############################################################
 
