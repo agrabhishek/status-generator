@@ -703,7 +703,7 @@ if llm_provider == "Groq (Free Tier)":
             default_index = available_models.index("moonshot-ai/kimi-k2-instruct")
         
         selected_groq_model = st.selectbox(
-            "Select Model",
+            "Select Model (suggestion use moonshotai/kimi-k2-instruct)",
             available_models,
             index=default_index,
             help="If you encounter rate limits, select a different model."
