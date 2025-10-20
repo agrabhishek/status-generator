@@ -10,6 +10,7 @@ from atlassian import Jira
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Tuple, Optional
+from llm_integrations import fetch_groq_models, get_llm_summary
 
 
 class JiraClient:
@@ -49,33 +50,33 @@ class JiraClient:
         
         return issues
     
-    def get_epic_context(self, epic_key: str) -> Dict:
-        """Fetch epic summary and description for context"""
-        try:
-            issue = self.jira.issue(epic_key)
-            fields = issue.get('fields', {})
-            return {
-                'summary': fields.get('summary') or 'No summary available',
-                'description': fields.get('description') or 'No description available'
-            }
-        except:
-            return {'summary': 'Unable to fetch epic', 'description': ''}
-    
-    def discover_projects(self) -> List[Dict]:
-        """Get all accessible projects"""
-        try:
-            response = self.jira.get('rest/api/3/project/search')
-            return response.get('values', [])
-        except:
-            # Fallback to JQL method
-            result = self.jira.jql('assignee = currentUser() OR reporter = currentUser()', limit=100)
-            issues = result.get('issues', [])
-            unique_projects = {}
-            for issue in issues:
-                proj = issue.get('fields', {}).get('project', {})
-                if proj:
-                    unique_projects[proj.get('key')] = proj.get('name', 'Unknown')
-            return [{'key': k, 'name': v} for k, v in unique_projects.items()]
+def get_epic_context(self, epic_key: str) -> Dict:
+    """Fetch epic summary and description for context"""
+    try:
+        issue = self.jira.issue(epic_key)
+        fields = issue.get('fields', {})
+        return {
+            'summary': fields.get('summary') or 'No summary available',
+            'description': fields.get('description') or 'No description available'
+        }
+    except:
+        return {'summary': 'Unable to fetch epic', 'description': ''}
+
+def discover_projects(self) -> List[Dict]:
+    """Get all accessible projects"""
+    try:
+        response = self.jira.get('rest/api/3/project/search')
+        return response.get('values', [])
+    except:
+        # Fallback to JQL method
+        result = self.jira.jql('assignee = currentUser() OR reporter = currentUser()', limit=100)
+        issues = result.get('issues', [])
+        unique_projects = {}
+        for issue in issues:
+            proj = issue.get('fields', {}).get('project', {})
+            if proj:
+                unique_projects[proj.get('key')] = proj.get('name', 'Unknown')
+        return [{'key': k, 'name': v} for k, v in unique_projects.items()]
 
 def fetch_issues(jira, jql, debug=False):
     """Standalone fetch_issues for backward compatibility"""
