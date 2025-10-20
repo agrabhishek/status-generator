@@ -77,6 +77,8 @@ jira-status-generator/
 
 ## License
 
-MIT
+This project is licensed under the [MIT License](LICENSE).
+© 2025 Abhishek Agrawal.  
+You are free to use, modify, and distribute this software under the terms of the MIT License.
+For inquiries or collaboration, connect with me on [LinkedIn](https://www.linkedin.com/in/abhishekagrawal03/).
 
-Generated: 2025-10-19 18:28:32
