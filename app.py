@@ -80,7 +80,7 @@ if selected_preset != "None":
             st.session_state[k] = v
 
 # Main inputs
-initiative_name = st.text_input("Initiative / Epic Name* (Type AWS for test setup)", key="initiative_name")
+initiative_name = st.text_input("Initiative / Epic Name* (Type AWS for test setup)", value="AWS", key="initiative_name")
 CREDENTIALS = st.secrets["jira"]
 # Jira URL - User choice or default
 use_default_jira = st.checkbox("Use default Jira configuration", value=True if CREDENTIALS['jira_url'] else False)
