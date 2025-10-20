@@ -15,7 +15,8 @@ from jira_core import (
     get_next_period_dates, 
     build_jql, 
     fetch_issues,
-    generate_report  # Add this
+    generate_report,
+    get_epic_context  
 )
 
 # Import from modular files
