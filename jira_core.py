@@ -77,6 +77,10 @@ class JiraClient:
                     unique_projects[proj.get('key')] = proj.get('name', 'Unknown')
             return [{'key': k, 'name': v} for k, v in unique_projects.items()]
 
+def fetch_issues(jira, jql, debug=False):
+    """Standalone fetch_issues for backward compatibility"""
+    client = JiraClient(jira)
+    return client.fetch_issues(jql, debug=debug)
 
 class JQLBuilder:
     """
