@@ -8,11 +8,10 @@ Generated: 2025-10-19 18:28:32
 
 import streamlit as st
 from atlassian import Jira
-from jira_core import JiraClient, JQLBuilder, get_next_period_dates, build_jql
+from jira_core import JiraClient, JQLBuilder, get_next_period_dates, build_jql, fetch_issues
 
 # Import from modular files
 from auth import load_secure_credentials, authenticate_jira
-#from jira_core import JiraClient, JQLBuilder, get_next_period_dates
 from llm_integrations import fetch_groq_models, get_llm_summary
 
 # from config import * (import all settings and prompts)
