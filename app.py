@@ -145,7 +145,7 @@ else:
         spaces = None
 
 labels = st.text_input("Labels (optional)", key="labels")
-persona = st.selectbox("Persona", ["Team Lead", "Manager", "Group Manager", "CTO"], key="persona")
+persona = st.selectbox("Persona", ["Team Lead", "Manager", "Group Manager", "CTO"], key="Group Manager")
 
 # LLM Provider Selection
 llm_provider = st.selectbox(
