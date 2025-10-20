@@ -16,7 +16,7 @@ from jira_core import (
     build_jql, 
     fetch_issues,
     generate_report,
-    get_epic_context  
+    #get_epic_context  
 )
 
 # Import from modular files
