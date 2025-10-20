@@ -8,6 +8,8 @@ Generated: 2025-10-19 18:28:32
 
 import streamlit as st
 from atlassian import Jira
+from io import BytesIO
+import pandas as pd
 
 from jira_core import (
     JiraClient, 
@@ -17,6 +19,63 @@ from jira_core import (
     fetch_issues,
     generate_report
 )
+# Optional PDF support
+try:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+
+# Optional Excel support
+try:
+    import openpyxl
+    EXCEL_AVAILABLE = True
+except ImportError:
+    EXCEL_AVAILABLE = False
+
+# EXPORT TO PDF
+def export_to_pdf(report_text, initiative_name):
+    """Export report to PDF with formatting"""
+    if not PDF_AVAILABLE:
+        raise ImportError("reportlab not installed. Run: pip install reportlab")
+    
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    story.append(Paragraph(f"<b>{initiative_name} - Status Report</b>", styles['Title']))
+    story.append(Spacer(1, 12))
+    
+    for line in report_text.split('\n'):
+        if line.strip():
+            story.append(Paragraph(line, styles['Normal']))
+            story.append(Spacer(1, 6))
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
+
+
+# EXPORT TO EXCEL
+def export_to_excel(df, next_df, report_text):
+    """Export to Excel with multiple sheets"""
+    if not EXCEL_AVAILABLE:
+        raise ImportError("openpyxl not installed. Run: pip install openpyxl")
+    
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Current Issues', index=False)
+        next_df.to_excel(writer, sheet_name='Next Steps', index=False)
+        
+        context_df = pd.DataFrame({'Report': [report_text]})
+        context_df.to_excel(writer, sheet_name='Full Report', index=False)
+    
+    buffer.seek(0)
+    return buffer
+
 # Import from modular files
 from auth import load_secure_credentials, authenticate_jira
 from llm_integrations import fetch_groq_models
