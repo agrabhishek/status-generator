@@ -174,6 +174,35 @@ def get_next_period_dates(current_period: str) -> str:
         raise ValueError("Invalid period")
     return f"{next_start.strftime('%Y-%m-%d')} to {next_end.strftime('%Y-%m-%d')}"
 
+def build_jql(spaces=None, labels=None, time_period=None, time_field='resolutiondate'):
+    """
+    Build JQL with proper quoting.
+    
+    REQUIREMENT: Business logic - resolutiondate for achievements, duedate for next steps
+    """
+    jql_parts = []
+    if spaces:
+        space_list = [s.strip().strip("'\"") for s in spaces.split(',')]
+        quoted_projects = [f'"{p}"' if ' ' in p else p for p in space_list]
+        if len(space_list) == 1:
+            jql_parts.append(f'project = {quoted_projects[0]}')
+        else:
+            jql_parts.append(f'project in ({", ".join(quoted_projects)})')
+    if labels:
+        label_list = [f'"{label.strip()}"' for label in labels.split(',')]
+        jql_parts.append(f'labels IN ({", ".join(label_list)})')
+    if time_period:
+        if time_period == 'last_week':
+            start_date = (datetime.now() - timedelta(weeks=1)).strftime('%Y-%m-%d')
+            jql_parts.append(f'{time_field} >= {start_date}')
+        elif time_period == 'last_month':
+            start_date = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+            jql_parts.append(f'{time_field} >= {start_date}')
+        elif ' to ' in time_period:
+            start, end = time_period.split(' to ')
+            jql_parts.append(f'{time_field} >= {start} AND {time_field} <= {end}')
+    return ' AND '.join(jql_parts) if jql_parts else 'project IS NOT EMPTY'
+
 # REPORT GENERATOR
 def generate_report(issues, persona, llm_provider, api_key, initiative_name, current_period, 
                    jira_client, spaces, labels, groq_model=None):
