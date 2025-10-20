@@ -10,7 +10,7 @@ from atlassian import Jira
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Tuple, Optional
-from llm_integrations import fetch_groq_models, get_llm_summary
+from llm_integrations import get_llm_summary
 #
 
 class JiraClient:
