@@ -20,19 +20,16 @@ from jira_core import (
 # Import from modular files
 from auth import load_secure_credentials, authenticate_jira
 from llm_integrations import fetch_groq_models
-
-# from config import * (import all settings and prompts)
-
 from storage import save_criteria, load_criteria, get_all_presets, delete_preset
 
-st.set_page_config(page_title="Jira AI Reports", page_icon="🚀", layout="wide")
+#st.set_page_config(page_title="Jira AI Reports", page_icon="🚀", layout="wide")
 
 # Initialize session state
 if 'generated_report' not in st.session_state:
     st.session_state.generated_report = None
 
-st.title("🚀 Jira AI Initiative Report Generator")
-st.markdown("***4-Section Executive Reports | Multi-LLM | Groq Free-Tier***")
+#st.title("🚀 Jira AI Initiative Report Generator")
+#st.markdown("***4-Section Executive Reports | Multi-LLM | Groq Free-Tier***")
 
 # ============================================================================
 # STREAMLIT UI
