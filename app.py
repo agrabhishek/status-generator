@@ -8,7 +8,15 @@ Generated: 2025-10-19 18:28:32
 
 import streamlit as st
 from atlassian import Jira
-from jira_core import JiraClient, JQLBuilder, get_next_period_dates, build_jql, fetch_issues
+
+from jira_core import (
+    JiraClient, 
+    JQLBuilder, 
+    get_next_period_dates, 
+    build_jql, 
+    fetch_issues,
+    generate_report  # Add this
+)
 
 # Import from modular files
 from auth import load_secure_credentials, authenticate_jira
