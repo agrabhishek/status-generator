@@ -48,10 +48,16 @@ jira-status-generator/
 ├── jira_core.py          # Business logic (Jira API, JQL, reports)
 ├── llm_integrations.py   # LLM providers (Groq, OpenAI, xAI, Gemini)
 ├── app.py                # Streamlit UI
-├── requirements.txt
+├── requirements.
+├── Version_detector.py
 └── tests/
     └── test_jira_core.py
 ```
+## Backlog
+- **Log number of calls**
+- **Pull custom ticket types, figure hierarchy and use to customize system prompt**
+- **Improve jira test project setup**
+- **Integrate with platforms other than Jira**
 
 ## Getting API Keys
 
