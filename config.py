@@ -3,34 +3,8 @@ Configuration and System Prompts for Jira Status Generator
 ===========================================================
 All prompts, settings, and constants centralized here.
 
-Generated: 2025-10-19 18:28:32
-"""
+Generated: 2025-10-19 (Updated for On-Prem Support)
 
-# Copy the complete config.py content from the artifact "config_file"
-# This file already exists in our conversation as a complete artifact
-# To get it: Look for artifact ID "config_file" 
-
-# For now, this is a placeholder - you'll copy the actual config.py content here
-# The full config.py was provided earlier with all prompts and settings
-
-from typing import Dict, List
-
-APP_NAME = "Jira AI Initiative Report Generator"
-APP_VERSION = "3.0.0"
-APP_ICON = "🚀"
-
-# TODO: Copy full content from config.py artifact provided earlier
-# This includes:
-# - JIRA_MAX_RESULTS_PER_PAGE = 50
-# - PERSONAS configuration
-# - PERSONA_PROMPTS dictionary
-# - ERROR_MESSAGES dictionary
-# - UI_HELP_TEXT dictionary
-# - LLM_CONFIG for Groq, OpenAI, xAI, Gemini
-# - All utility functions
-"""
-Configuration and System Prompts for Jira Status Generator
-===========================================================
 REQUIREMENTS ADDRESSED:
 - Persona-Specific Tailoring: All LLM prompts centralized
 - Error Handling and Feedback: Centralized error messages
@@ -38,13 +12,13 @@ REQUIREMENTS ADDRESSED:
 - Pagination and Scalability: Configurable page sizes
 - Multi-LLM Integration: Provider settings
 - Export Options: Format configurations
+- On-Premise Jira Support: Authentication, API versions, SSL handling
 
 All constants, prompts, and settings in ONE place.
 Modify prompts here to change AI behavior without touching core logic.
 
 Comment Rule: 1 comment per 7-10 lines, connected to requirements
 """
-
 from typing import Dict, List
 
 # ============================================================================
@@ -52,7 +26,7 @@ from typing import Dict, List
 # ============================================================================
 
 APP_NAME = "Jira AI Initiative Report Generator"
-APP_VERSION = "2.6.0"
+APP_VERSION = "3.1.0"  # Updated for on-prem support
 APP_ICON = "🚀"
 
 
@@ -66,6 +40,11 @@ JIRA_MAX_RESULTS_PER_PAGE = 50  # Optimal for Jira Cloud API
 JIRA_TOTAL_MAX_RESULTS = 1000   # Maximum issues to fetch per query
 JIRA_API_VERSION = "3"           # Jira Cloud REST API version
 JIRA_TIMEOUT_SECONDS = 30        # API request timeout
+
+# On-Premise Support
+JIRA_TYPES = ["Cloud", "On-Premise"]
+ON_PREM_AUTH_TYPES = ["Password", "Personal Access Token"]
+API_VERSIONS = ["Auto-detect", "Force v2", "Force v3"]
 
 
 # ============================================================================
@@ -355,10 +334,50 @@ Consider:
     "api_auth_failed": """🔐 Jira authentication failed.
 
 Please verify:
-- Email address matches your Jira account exactly
-- API token is valid (regenerate at https://id.atlassian.com/manage-profile/security/api-tokens)
-- URL includes https:// and ends with .atlassian.net
+- Email address matches your Jira account exactly (Cloud)
+- Username is correct (On-Premise)
+- API token/password is valid
+- URL is correct and accessible
 - You have permission to access the specified project""",
+    
+    "on_prem_ssl_warning": """⚠️ SSL Verification Disabled
+
+You have disabled SSL certificate verification. This is INSECURE and should only be used:
+- In development environments
+- With self-signed certificates you trust
+- Behind corporate firewalls
+
+⚠️ WARNING: Your connection is vulnerable to man-in-the-middle attacks.
+Your credentials could be intercepted.""",
+    
+    "on_prem_connection_failed": """❌ Cannot reach on-prem Jira server.
+
+Check:
+- Is the server URL correct?
+- Are you connected to VPN (if required)?
+- Is Jira server running and accessible?
+- Check firewall rules and network connectivity
+- Try accessing the URL in your browser first
+- Verify the port number (default: 8080)""",
+    
+    "on_prem_auth_failed": """🔐 On-prem authentication failed.
+
+Verify:
+- Username (not email) is correct
+- Password is correct (or use Personal Access Token)
+- Account is not locked
+- User has permission to access Jira
+- CAPTCHA is not triggered (too many failed attempts)""",
+    
+    "api_version_mismatch": """⚠️ API version incompatibility detected.
+
+Your Jira version may not support REST API v3.
+
+Solutions:
+- Try selecting 'Force v2' in Advanced Settings
+- Check your Jira Server version (needs 8.0+ for v3, 7.0+ for v2)
+- Contact your Jira administrator for version info
+- On-prem Jira typically uses API v2""",
     
     "llm_error": """⚠️ AI summary generation failed: {error}
 
@@ -445,18 +464,38 @@ This name appears in:
 - Exported PDF/Excel file names
 - Saved presets""",
     
+    "jira_type_selection": """🏢 **Jira Type**
+
+**Cloud**: Jira hosted by Atlassian (*.atlassian.net)
+├─ Authentication: Email + API Token
+├─ API: REST API v3
+└─ Always HTTPS
+
+**On-Premise**: Self-hosted Jira Server/Data Center
+├─ Authentication: Username + Password (or PAT)
+├─ API: REST API v2 or v3 (depends on version)
+├─ URL: Any domain or IP address
+└─ May use HTTP or self-signed SSL certificates
+
+Choose based on where your Jira is hosted.""",
+    
     "jira_url": """🌐 **Jira Instance URL**
 
-Your Jira Cloud instance URL.
-
+**For Cloud:**
 Format: https://yourcompany.atlassian.net
+
+**For On-Premise:**
+Examples:
+- https://jira.company.com
+- https://jira.company.com:8080
+- http://10.0.1.50:8080 (if HTTP only)
 
 ❌ Don't include:
 - /browse/ paths
 - Issue keys (AWS-123)
 - Trailing slashes""",
     
-    "api_token": """🔑 **Jira API Token**
+    "api_token": """🔑 **Jira API Token (Cloud)**
 
 Generate a personal API token at:
 https://id.atlassian.com/manage-profile/security/api-tokens
@@ -466,6 +505,59 @@ Security notes:
 - Never commit to version control
 - Tokens are NOT saved in presets
 - Regenerate if compromised""",
+    
+    "onprem_username": """👤 **Username (On-Premise)**
+
+Use your Jira username (not email).
+
+Examples:
+- john.doe
+- jdoe
+- john_doe
+
+Note: This is different from Cloud which uses email addresses.
+Check with your Jira administrator if unsure.""",
+    
+    "onprem_password": """🔒 **Password / Personal Access Token**
+
+**Password**: Your regular Jira login password
+
+**Personal Access Token (Recommended)**:
+- More secure than passwords
+- Can be revoked without changing password
+- Generate in Jira: Profile → Personal Access Tokens
+- Available in Jira Server 8.14+ and Data Center
+
+⚠️ Password is NOT saved in presets for security.""",
+    
+    "ssl_verification": """🔒 **SSL Certificate Verification**
+
+⚠️ Only disable if:
+- Using self-signed certificates (development/internal)
+- You trust the server completely
+- Behind corporate firewall
+
+🚨 Security Risk:
+Disabling SSL verification makes your connection vulnerable to attacks.
+Your credentials could be intercepted.
+
+Recommendation: Get a valid SSL certificate from your IT team.""",
+    
+    "api_version_selection": """🔧 **API Version (Advanced)**
+
+**Auto-detect** (Recommended):
+- Tries v3 first, falls back to v2
+- Works for most installations
+
+**Force v2**:
+- For older Jira Server (7.0-8.x)
+- If auto-detect fails
+
+**Force v3**:
+- For newer installations (8.0+)
+- Cloud always uses v3
+
+Most users should leave this as Auto-detect.""",
     
     "project_spaces": """📂 **Jira Project Keys**
 
@@ -610,14 +702,24 @@ VALIDATION = {
         "max_length": 100,
         "required": True
     },
-    "jira_url": {
+    "jira_url_cloud": {
         "pattern": r"^https://[\w-]+\.atlassian\.net/?$",
         "required": True,
         "example": "https://yourcompany.atlassian.net"
     },
+    "jira_url_onprem": {
+        "pattern": r"^https?://[\w\.-]+(:\d+)?(/.*)?$",  # Allows HTTP, IPs, ports
+        "required": True,
+        "example": "https://jira.company.com:8080"
+    },
     "email": {
         "pattern": r"^[\w\.-]+@[\w\.-]+\.\w+$",
         "required": True
+    },
+    "username": {
+        "min_length": 2,
+        "required": True,
+        "example": "john.doe"
     },
     "project_spaces": {
         "min_length": 1,
@@ -646,6 +748,7 @@ FEATURES = {
     "export_excel": True,
     "preset_management": True,
     "project_discovery": True,
+    "on_prem_support": True,  # On-premise Jira support enabled
     "debug_mode": False    # Enable for verbose logging
 }
 
@@ -747,3 +850,32 @@ def validate_input(field: str, value: str) -> tuple[bool, str]:
     
     return True, ""
 
+
+def validate_url_for_jira_type(url: str, jira_type: str) -> tuple[bool, str]:
+    """
+    Validate URL based on Jira type (Cloud vs On-Premise).
+    
+    NEW: Added for on-prem support
+    
+    Args:
+        url: Jira URL to validate
+        jira_type: "Cloud" or "On-Premise"
+    
+    Returns:
+        (is_valid, error_message or warning)
+    """
+    import re
+    
+    if jira_type == "Cloud":
+        rules = VALIDATION["jira_url_cloud"]
+    else:
+        rules = VALIDATION["jira_url_onprem"]
+    
+    if not re.match(rules["pattern"], url):
+        return False, f"Invalid URL format. Example: {rules['example']}"
+    
+    # Warn about HTTP for on-prem
+    if jira_type == "On-Premise" and url.startswith("http://"):
+        return True, "⚠️ Warning: Using HTTP (not secure). Consider HTTPS."
+    
+    return True, ""
