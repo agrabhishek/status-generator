@@ -30,10 +30,10 @@ def load_secure_credentials() -> Dict[str, Optional[str]]:
         Dict with jira_email, jira_token, jira_url, groq_api_key
     """
     return {
-        'jira_email': st.secrets.get("jira", {}).get("email") or os.getenv("JIRA_EMAIL"),
-        'jira_token': st.secrets.get("jira", {}).get("api_token") or os.getenv("JIRA_API_TOKEN"),
-        'jira_url': st.secrets.get("jira", {}).get("default_url") or os.getenv("JIRA_DEFAULT_URL"),
-        'groq_api_key': st.secrets.get("groq", {}).get("api_key") or os.getenv("GROQ_API_KEY")
+        'jira_email': st.secrets.get("jira", {}).get("jira_email") or os.getenv("JIRA_EMAIL"),
+        'jira_token': st.secrets.get("jira", {}).get("jira_token") or os.getenv("JIRA_API_TOKEN"),
+        'jira_url': st.secrets.get("jira", {}).get("jira_default_url") or os.getenv("JIRA_DEFAULT_URL"),
+        'groq_api_key': st.secrets.get("groq", {}).get("groq_api_key") or os.getenv("GROQ_API_KEY")
     }
 
 

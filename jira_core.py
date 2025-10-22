@@ -20,7 +20,7 @@ import pandas as pd
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Tuple, Optional
 import streamlit as st
-
+from version_detector import JiraVersionDetector
 
 class JiraClient:
     """
@@ -39,8 +39,9 @@ class JiraClient:
             is_cloud: True for Jira Cloud, False for On-Premise
         """
         self.jira = jira
-        self.is_cloud = is_cloud
-        self.api_version = None  # Will be detected
+        self.detector = JiraVersionDetector(jira)
+        self.jira_type = self.detector.detect_jira_type()
+        self.api_version = self.detector.detect_api_version()
         
         # Detect API version for on-prem
         if not is_cloud:
@@ -106,43 +107,29 @@ class JiraClient:
             return {'summary': 'Unable to fetch epic', 'description': ''}
     
     def discover_projects(self) -> List[Dict]:
-        """
-        Get all accessible projects.
-        
-        REQUIREMENT: On-Premise Support
-        Tries v3 endpoint, falls back to v2, then JQL method
-        """
-        # Method 1: Try v3 endpoint (Cloud and newer On-Premise)
+        """Get all accessible projects"""
         try:
-            response = self.jira.get('rest/api/3/project/search')
-            if response and 'values' in response:
+            # Use version-aware endpoint
+            endpoint = self.detector.get_projects_endpoint()
+            response = self.jira.get(endpoint)
+            
+            # Handle different response formats
+            if isinstance(response, dict):
                 return response.get('values', [])
-        except:
-            pass
-        
-        # Method 2: Try v2 endpoint (Older On-Premise)
-        try:
-            response = self.jira.get('rest/api/2/project')
-            if response and isinstance(response, list):
+            elif isinstance(response, list):
                 return response
+            else:
+                return []
         except:
-            pass
-        
-        # Method 3: Fallback to JQL method
-        try:
+            # Fallback to JQL method
             result = self.jira.jql('assignee = currentUser() OR reporter = currentUser()', limit=100)
             issues = result.get('issues', [])
             unique_projects = {}
             for issue in issues:
                 proj = issue.get('fields', {}).get('project', {})
                 if proj:
-                    key = proj.get('key')
-                    name = proj.get('name', 'Unknown')
-                    if key:
-                        unique_projects[key] = name
+                    unique_projects[proj.get('key')] = proj.get('name', 'Unknown')
             return [{'key': k, 'name': v} for k, v in unique_projects.items()]
-        except:
-            return []
 
 
 class JQLBuilder:

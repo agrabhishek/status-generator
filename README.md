@@ -54,7 +54,9 @@ jira-status-generator/
     └── test_jira_core.py
 ```
 ## Backlog
+- **Update test cases**
 - **Log number of calls**
+- **add planner, executer, evaluator flow**
 - **Pull custom ticket types, figure hierarchy and use to customize system prompt**
 - **Improve jira test project setup**
 - **Integrate with platforms other than Jira**
