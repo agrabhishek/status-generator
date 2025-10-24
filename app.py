@@ -291,7 +291,7 @@ labels = st.text_input("Labels (optional)", key="labels")
 #persona = st.selectbox("Persona", ["Team Lead", "Manager", "Group Manager", "CTO"], key="persona")
 st.header("👤 PERSONA")
 persona = st.selectbox("Persona", ["Team Lead", "manager", "cto", "group_manager"], key="persona")
-persona_prompt = st.text_area("Persona Prompt", value=PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["team_lead"]), key="persona_prompt")
+persona_prompt = st.text_area("Persona Prompt (Try editing this!)", value=PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["team_lead"]), key="persona_prompt")
 # ============================================================================
 # LLM PROVIDER SELECTION
 # ============================================================================
