@@ -22,6 +22,13 @@ from typing import List, Dict, Tuple, Optional
 import streamlit as st
 from version_detector import JiraVersionDetector
 
+PERSONA_PROMPTS = {
+    "team_lead": "Display the completed Jira tickets with the following details: Key, Summary, Status, Assignee, Priority, Due Date, Created, Updated, and Subtasks. Include both the completed tickets and their subtasks. Format the output in a tabular form with each column representing a different attribute.",
+    "manager": "Display the completed Jira tickets with the following details: Key, Summary, Status, Assignee, Priority, Due Date, Created, Updated, and Subtasks. Include both the completed tickets and their subtasks. Format the output in a tabular form with each column representing a different attribute. Provide a summary of the completed tickets and highlight the key accomplishments of the team.",
+    "group_manager": "Display the completed Jira tickets with the following details: Key, Summary, Status, Assignee, Priority, Due Date, Created, Updated, and Subtasks. Include both the completed tickets and their subtasks. Format the output in a tabular form with each column representing a different attribute. Provide a summary of the completed tickets and highlight the key achievements of the team.",
+    "cto": "Display the completed Jira tickets with the following details: Key, Summary, Status, Assignee, Priority, Due Date, Created, Updated, and Subtasks. Include both the completed tickets and their subtasks. Format the output in a tabular form with each column representing a different attribute. Provide a summary of the completed tickets and highlight the key deliverables and outcomes of the initiative.",
+    "manager": "Display the completed Jira tickets with the following details: Key, Summary, Status, Assignee, Priority, Due Date, Created, Updated, and Subtasks. Include both the completed tickets and their subtasks. Format the output in a tabular form with each column representing a different attribute. Provide a summary of the completed tickets and highlight the key accomplishments of the team.",
+}
 class JiraClient:
     """
     Wrapper for Jira API interactions.
@@ -303,7 +310,7 @@ def get_epic_context(jira, epic_key):
 
 
 def generate_report(issues, persona, llm_provider, api_key, initiative_name, current_period, 
-                   jira_client, spaces, labels, groq_model=None):
+                   jira_client, spaces, labels, groq_model=None, persona_prompt=None):
     """
     Generate complete 4-section executive report.
     
@@ -411,13 +418,13 @@ def generate_report(issues, persona, llm_provider, api_key, initiative_name, cur
     achievements_summary = hierarchy_text
     if api_key and achieved_keys and llm_provider != "None":
         if persona == 'team_lead':
-            prompt = f"Summarize these completed Jira tickets for a team lead (technical details matter):\n{hierarchy_text}"
+            prompt = f"Summarize these completed Jira tickets for a team lead (technical details matter):\n{persona_prompt}\n{hierarchy_text}"
         elif persona == 'manager':
-            prompt = f"Write a concise executive paragraph summarizing these achievements for a manager (focus on outcomes, not technical details):\n{hierarchy_text}"
+            prompt = f"Write a concise executive paragraph summarizing these achievements for a manager (focus on outcomes, not technical details):\n{persona_prompt}\n{hierarchy_text}"
         elif persona == 'group_manager':
-            prompt = f"Write a strategic summary for a group manager highlighting business impact and team performance:\n{hierarchy_text}"
+            prompt = f"Write a strategic summary for a group manager highlighting business impact and team performance:\n{persona_prompt}\n{hierarchy_text}"
         elif persona == 'cto':
-            prompt = f"Write a high-level executive summary for CTO highlighting strategic value and key deliverables:\n{hierarchy_text}"
+            prompt = f"Write a high-level executive summary for CTO highlighting strategic value and key deliverables:\n{persona_prompt}\n{hierarchy_text}"
         else:
             prompt = f"Summarize these completed Jira tickets:\n{hierarchy_text}"
             

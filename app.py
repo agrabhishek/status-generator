@@ -11,6 +11,7 @@ from atlassian import Jira
 from io import BytesIO
 import pandas as pd
 from datetime import datetime, timedelta
+#from jira_core import PERSONA_PROMPTS
 
 from jira_core import (
     JiraClient, 
@@ -18,7 +19,8 @@ from jira_core import (
     get_next_period_dates, 
     build_jql, 
     fetch_issues,
-    generate_report
+    generate_report,
+    PERSONA_PROMPTS
 )
 from auth import load_secure_credentials
 from llm_integrations import fetch_groq_models
@@ -141,7 +143,7 @@ if selected_preset != "None":
 # ============================================================================
 
 initiative_name = st.text_input("Initiative / Epic Name*", value="AWS",  key="initiative_name")
-
+st.header("👤 JIRA Details")
 # STEP 1: Use default configuration checkbox (shown FIRST)
 use_default_jira = st.checkbox(
     "Use default Jira configuration", 
@@ -286,12 +288,14 @@ else:
 
 # Common inputs (always shown)
 labels = st.text_input("Labels (optional)", key="labels")
-persona = st.selectbox("Persona", ["Team Lead", "Manager", "Group Manager", "CTO"], key="persona")
-
+#persona = st.selectbox("Persona", ["Team Lead", "Manager", "Group Manager", "CTO"], key="persona")
+st.header("👤 PERSONA")
+persona = st.selectbox("Persona", ["Team Lead", "manager", "cto", "group_manager"], key="persona")
+persona_prompt = st.text_area("Persona Prompt", value=PERSONA_PROMPTS.get(persona, PERSONA_PROMPTS["team_lead"]), key="persona_prompt")
 # ============================================================================
 # LLM PROVIDER SELECTION
 # ============================================================================
-
+st.header("👤 LLM Selection")
 llm_provider = st.selectbox(
     "LLM Provider", 
     ["Groq (Free Tier)", "OpenAI", "xAI", "Gemini", "None"], 
@@ -338,7 +342,7 @@ elif llm_provider in ["OpenAI", "xAI", "Gemini"]:
 # ============================================================================
 # PERIOD SELECTION
 # ============================================================================
-
+st.header("👤 Reporting details")
 period = st.selectbox("Reporting Period", ["last_week", "last_month", "Custom"], key="period")
 
 if period == "Custom":
@@ -397,7 +401,8 @@ if st.button("📄 Generate Report"):
                     jira_client, 
                     spaces, 
                     labels,
-                    groq_model=selected_groq_model
+                    groq_model=selected_groq_model,
+                    persona_prompt=persona_prompt
                 )
                 
                 # Store in session state
