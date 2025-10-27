@@ -23,12 +23,77 @@ import streamlit as st
 from version_detector import JiraVersionDetector
 
 PERSONA_PROMPTS = {
-    "team_lead": "Display the completed Jira tickets with the following details: Key, Summary, Status, Assignee, Priority, Due Date, Created, Updated, and Subtasks. Include both the completed tickets and their subtasks. Format the output in a tabular form with each column representing a different attribute.",
-    "manager": "Display the completed Jira tickets with the following details: Key, Summary, Status, Assignee, Priority, Due Date, Created, Updated, and Subtasks. Include both the completed tickets and their subtasks. Format the output in a tabular form with each column representing a different attribute. Provide a summary of the completed tickets and highlight the key accomplishments of the team.",
-    "group_manager": "Display the completed Jira tickets with the following details: Key, Summary, Status, Assignee, Priority, Due Date, Created, Updated, and Subtasks. Include both the completed tickets and their subtasks. Format the output in a tabular form with each column representing a different attribute. Provide a summary of the completed tickets and highlight the key achievements of the team.",
-    "cto": "Display the completed Jira tickets with the following details: Key, Summary, Status, Assignee, Priority, Due Date, Created, Updated, and Subtasks. Include both the completed tickets and their subtasks. Format the output in a tabular form with each column representing a different attribute. Provide a summary of the completed tickets and highlight the key deliverables and outcomes of the initiative.",
-    "manager": "Display the completed Jira tickets with the following details: Key, Summary, Status, Assignee, Priority, Due Date, Created, Updated, and Subtasks. Include both the completed tickets and their subtasks. Format the output in a tabular form with each column representing a different attribute. Provide a summary of the completed tickets and highlight the key accomplishments of the team.",
+    "team_lead": """Generate a detailed ticket-level report summarizing completed Jira tickets for the specified project, labels, and time period. 
+Include both completed tickets and their subtasks.
+
+Instructions:
+- Present data in a tabular format with columns: Key, Summary, Status, Assignee, Priority, Due Date, Created, Updated, Subtasks.
+- Follow the table with a concise factual summary paragraph describing major work completed, key improvements, or progress trends.
+- Maintain a professional, matter-of-fact tone (avoid “I did” or “Team did”).
+- Keep variable placeholders as-is.
+
+Few-Shot Example:
+
+| Key      | Summary                        | Status | Assignee | Priority | Due Date   | Created   | Updated   | Subtasks        |
+|-----------|--------------------------------|--------|-----------|-----------|-------------|-----------|-----------|-----------------|
+| JIRA-145  | Refactored login API           | Done   | Alex      | High      | 2025-09-21  | 2025-09-01 | 2025-09-20 | JIRA-146,147    |
+| JIRA-152  | Added role-based access control | Done  | Sam       | Medium    | 2025-09-19  | 2025-09-03 | 2025-09-18 | —               |
+
+Summary:
+Completed key backend refactors and implemented role-based access controls improving API response time by 20%. All subtasks related to authentication and authorization modules were completed within the sprint period.
+""",
+
+    "manager": """Generate a summary report for completed Jira tickets within the specified project, labels, and time period. 
+Do not include ticket-level tables.
+
+Instructions:
+- Focus on team-level accomplishments and outcomes.
+- Highlight progress trends, major deliverables, and milestone completions.
+- Maintain a factual, concise tone. Avoid references to “team,” “we,” or “I.”
+- Keep variables unchanged.
+
+Few-Shot Example:
+
+Summary:
+Completed key sprint deliverables on schedule, including backend API enhancements and frontend UI stabilization. 
+Reduced average response times by 20% and closed all pending P1 issues. 
+Prepared foundations for next sprint’s authentication module release.
+""",
+
+    "group_manager": """Generate a higher-level summary report covering completed Jira tickets for the selected project, labels, and time period. 
+Do not include ticket-level data.
+
+Instructions:
+- Focus on cross-team outcomes, alignment with broader goals, and significant progress milestones.
+- Highlight efficiency improvements, output consistency, and delivery predictability.
+- Maintain an objective, executive-report tone without self- or team-referential phrasing.
+- Keep variables as-is.
+
+Few-Shot Example:
+
+Summary:
+Delivered key product milestones improving system reliability and throughput. 
+Multiple teams closed high-priority items ahead of schedule, enhancing release stability. 
+The initiative achieved targeted performance benchmarks and advanced quarterly objectives on scalability and maintainability.
+""",
+
+    "cto": """Generate a strategic outcome summary based on Jira ticket completions for the given project, labels, and time period. 
+Do not include ticket-level details.
+
+Instructions:
+- Summarize initiative-level progress, key deliverables, and measurable impact.
+- Use a concise, executive summary style focusing on outcomes, business value, or strategic alignment.
+- Maintain a neutral, factual tone; avoid “I,” “team,” or “we.”
+- Keep variables unchanged.
+
+Few-Shot Example:
+
+Summary:
+Achieved the quarter’s platform scalability milestone, enabling 30% higher transaction throughput and 15% reduction in latency. 
+Deliverables directly support annual OKRs focused on performance, reliability, and infrastructure efficiency.
+"""
 }
+
 class JiraClient:
     """
     Wrapper for Jira API interactions.

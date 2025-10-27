@@ -22,7 +22,7 @@ from jira_core import (
     generate_report,
     PERSONA_PROMPTS
 )
-from auth import load_secure_credentials
+from auth import load_secure_credentials, validate_credentials
 from llm_integrations import fetch_groq_models
 from storage import save_criteria, load_criteria, get_all_presets, delete_preset
 
@@ -106,6 +106,13 @@ st.markdown("***4-Section Executive Reports | Multi-LLM | Cloud & On-Prem Suppor
 
 # Load credentials
 CREDENTIALS = load_secure_credentials()
+
+# Validate credentials early
+creds_valid, creds_message = validate_credentials(CREDENTIALS)
+if not creds_valid:
+    st.error(creds_message)
+    st.info("💡 **Quick Fix**: Check your `.streamlit/secrets.toml` file and ensure field names match exactly.")
+    st.stop()
 
 # Sidebar presets
 st.sidebar.markdown("### 💾 PRESETS")

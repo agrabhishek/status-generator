@@ -25,12 +25,12 @@ Create `.streamlit/secrets.toml`:
 
 ```toml
 [jira]
-email = "your-email@company.com"
-api_token = "your-jira-api-token"
-default_url = "https://yourcompany.atlassian.net"
+jira_email = "your-email@company.com"
+jira_token = "your-jira-api-token"
+jira_default_url = "https://yourcompany.atlassian.net"
 
 [groq]
-api_key = "gsk_your-groq-api-key"
+groq_api_key = "gsk_your-groq-api-key"
 ```
 
 ### 3. Run Application

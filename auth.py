@@ -37,6 +37,59 @@ def load_secure_credentials() -> Dict[str, Optional[str]]:
     }
 
 
+def validate_credentials(credentials: Dict[str, Optional[str]]) -> Tuple[bool, str]:
+    """
+    Validate that required Jira credentials are present and properly formatted.
+    
+    Helps catch common configuration errors like using wrong field names in secrets.toml
+    
+    Args:
+        credentials: Dict from load_secure_credentials()
+    
+    Returns:
+        (is_valid, error_message)
+    """
+    # Check for missing credentials
+    missing = []
+    if not credentials.get('jira_email'):
+        missing.append('jira_email')
+    if not credentials.get('jira_token'):
+        missing.append('jira_token')
+    if not credentials.get('jira_url'):
+        missing.append('jira_url')
+    
+    if missing:
+        error_msg = f"""❌ Missing Jira credentials: {', '.join(missing)}
+
+Your .streamlit/secrets.toml must use these exact field names:
+
+[jira]
+jira_email = "your-email@company.com"
+jira_token = "your-api-token"
+jira_default_url = "https://yourcompany.atlassian.net"
+
+Common mistake: Using 'email' instead of 'jira_email', or 'api_token' instead of 'jira_token'
+"""
+        return False, error_msg
+    
+    # Check for whitespace issues
+    email = credentials['jira_email'].strip()
+    token = credentials['jira_token'].strip()
+    url = credentials['jira_url'].strip()
+    
+    if email != credentials['jira_email'] or token != credentials['jira_token']:
+        return False, "⚠️ Credentials contain extra whitespace. Remove leading/trailing spaces."
+    
+    # Basic format validation
+    if '@' not in email:
+        return False, f"❌ Invalid email format: {email}"
+    
+    if not url.startswith('http'):
+        return False, f"❌ Invalid URL format: {url} (must start with http:// or https://)"
+    
+    return True, "✅ Credentials format valid"
+
+
 def authenticate_jira_cloud(url: str, email: str, token: str) -> Jira:
     """
     Authenticate with Jira Cloud using email and API token.
