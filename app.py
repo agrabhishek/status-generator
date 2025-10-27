@@ -104,6 +104,20 @@ if 'generated_next_df' not in st.session_state:
 st.title("🚀 Jira AI Initiative Report Generator")
 st.markdown("***4-Section Executive Reports | Multi-LLM | Cloud & On-Prem Support***")
 
+# Disclaimer
+with st.expander("⚠️ Important: Please Read Before Using", expanded=False):
+    st.warning("""
+    **This is an open-source tool provided "as-is" with limited testing.**
+    
+    - **Always proof-read AI-generated content** before sharing with stakeholders
+    - Verify all metrics and ticket data for accuracy
+    - Use as a starting point, not final output
+    - Test with your Jira setup before relying on it for critical reports
+    
+    The accuracy of reports depends on your Jira data quality and AI interpretation.
+    Use at your own discretion.
+    """)
+
 # Load credentials
 CREDENTIALS = load_secure_credentials()
 

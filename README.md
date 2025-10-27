@@ -82,6 +82,28 @@ jira-status-generator/
 - Use Streamlit Cloud secrets UI for deployment
 - API keys are never logged or displayed
 
+## Disclaimer
+
+⚠️ **Important: Read Before Using**
+
+This is an **open-source project provided "as-is"** with no warranties or guarantees. 
+
+**Please note:**
+- **Limited Testing:** This tool has undergone limited testing. Always test with your specific Jira setup before relying on it for critical reports.
+- **AI-Generated Content:** Reports use AI (LLMs) to generate summaries. **Always proof-read and validate AI-generated content** before sharing with stakeholders.
+- **Use at Your Own Risk:** The accuracy of reports depends on your Jira data quality and the LLM's interpretation. Verify all data before making business decisions.
+- **No Guarantees:** I do not guarantee accuracy, reliability, or fitness for any particular purpose.
+- **Starting Point, Not Final Output:** Use generated reports as a foundation to build upon, not as final deliverables.
+
+**Recommended Practice:**
+1. Generate your report
+2. Review all data points for accuracy
+3. Verify AI summaries match actual work completed
+4. Edit/customize as needed for your audience
+5. Double-check metrics and ticket counts
+
+**Contributions Welcome:** This is early-stage software. Bug reports, feature requests, and PRs are appreciated on GitHub!
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).

@@ -26,3 +26,9 @@ htmlcov/
 # Data
 jira_presets.json
 *.log
+
+# Marketing / Social Media Drafts
+LINKEDIN_POST.md
+LINKEDIN_POST_WITH_SLIDES.md
+SLIDE_SUMMARY.md
+SLIDE_SUMMARY_SHORT.md
