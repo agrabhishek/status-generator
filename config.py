@@ -879,3 +879,326 @@ def validate_url_for_jira_type(url: str, jira_type: str) -> tuple[bool, str]:
         return True, "⚠️ Warning: Using HTTP (not secure). Consider HTTPS."
     
     return True, ""
+
+
+# ============================================================================
+# AI AS JUDGE - AUTO VALIDATION & REGENERATION
+# ============================================================================
+# REQUIREMENT: Automatic validation with regeneration loop
+# Ensures reports are fully grounded in actual ticket data
+
+# AI Judge Configuration
+AI_JUDGE_CONFIG = {
+    "enabled": False,
+    "auto_validate": True,  # Automatically run after report generation
+    "auto_regenerate": True,  # Auto-regenerate if issues found
+    "max_regeneration_attempts": 2,  # Fail-safe: max 2 regeneration loops
+    "temperature": 0.3,  # Lower temperature for consistent evaluation
+    "max_tokens": 1200,  # Allows for detailed issue reporting without truncation
+    "strict_mode": True  # Reject any ungrounded content
+}
+
+# Regeneration control messages
+REGENERATION_MESSAGES = {
+    "validation_failed": "⚠️ AI Judge detected issues. Regenerating report...",
+    "max_attempts_reached": "❌ Maximum regeneration attempts (2) reached. Manual review required.",
+    "validation_passed": "✅ AI Judge validation passed. Report is trustworthy.",
+    "insufficient_data": "⚠️ Some sections lack sufficient Jira data and were left blank."
+}
+
+# AI Judge Prompts with Strict Verification
+AI_JUDGE_PROMPTS = {
+    "team_lead": """You are an AI judge performing STRICT VERIFICATION of a technical summary report.
+Your role: Ensure EVERY statement is grounded in actual ticket data. Flag ANY fabrication or inference.
+
+=== ORIGINAL TICKET DATA (GROUND TRUTH) ===
+{ticket_data}
+
+=== GENERATED SUMMARY (TO BE VERIFIED) ===
+{summary_text}
+
+=== STRICT VERIFICATION PROTOCOL ===
+
+1. ✅ COMPLETENESS (Critical)
+   □ Count all tickets in data: {ticket_count} tickets
+   □ Verify summary accounts for all tickets
+   □ List missing ticket IDs: ________________
+   □ Status: PASS / FAIL
+
+2. ✅ ACCURACY - ZERO TOLERANCE FOR HALLUCINATION (Critical)
+   □ Every ticket ID mentioned exists in data: YES / NO
+   □ Statuses match actual data: YES / NO
+   □ Assignees match actual data: YES / NO
+   □ Technical details exist in ticket descriptions: YES / NO
+   □ No invented metrics or claims: YES / NO
+   □ List fabricated content: ________________
+   □ Status: PASS / FAIL
+
+3. ✅ GROUNDING CHECK (Critical)
+   For each technical claim in summary:
+   □ Check if grounded in ticket summary/description
+   □ Flag any inferred or assumed information
+   □ List ungrounded claims: ________________
+   □ Status: PASS / FAIL
+
+4. ✅ METRIC VERIFICATION (Critical)
+   □ Total tickets claimed vs actual: ____ vs {ticket_count}
+   □ Completion count matches: YES / NO
+   □ Percentages correctly calculated: YES / NO
+   □ List metric errors: ________________
+   □ Status: PASS / FAIL
+
+5. ✅ MISSING CRITICAL DATA (Warning)
+   □ Tickets lack technical details: List IDs ________________
+   □ Missing architectural information: YES / NO
+   □ Insufficient data sections: ________________
+   □ Status: OK / INSUFFICIENT_DATA
+
+6. ✅ TECHNICAL DEPTH (Advisory)
+   □ Appropriate detail level for Team Lead: YES / NO
+   □ Specific components/APIs mentioned: YES / NO
+   □ Architectural decisions captured: YES / NO
+
+=== OUTPUT FORMAT (JSON-LIKE) ===
+```
+TRUSTWORTHINESS_SCORE: [1-10]
+VALIDATION_STATUS: [PASS / FAIL / INSUFFICIENT_DATA]
+
+COMPLETENESS: [PASS/FAIL]
+Missing_Tickets: [list or "None"]
+
+ACCURACY: [PASS/FAIL]
+Fabricated_Content: [list or "None"]
+Hallucinated_IDs: [list or "None"]
+
+GROUNDING: [PASS/FAIL]
+Ungrounded_Claims: [list or "None"]
+
+METRICS: [PASS/FAIL]
+Metric_Errors: [list or "None"]
+
+INSUFFICIENT_DATA_SECTIONS: [list or "None"]
+
+REGENERATION_REQUIRED: [YES/NO]
+REGENERATION_INSTRUCTIONS: [Specific fixes needed, or "None"]
+
+RECOMMENDATION: [APPROVE / REGENERATE / MANUAL_REVIEW]
+```
+
+Be ruthlessly strict. Any unverifiable content = FAIL.
+""",
+
+    "manager": """You are an AI judge performing STRICT VERIFICATION of an executive summary.
+Your role: Ensure business claims are grounded in actual ticket deliverables.
+
+=== ORIGINAL TICKET DATA (GROUND TRUTH) ===
+{ticket_data}
+
+=== GENERATED SUMMARY (TO BE VERIFIED) ===
+{summary_text}
+
+=== STRICT VERIFICATION PROTOCOL ===
+
+1. ✅ COMPLETENESS (Critical)
+   □ All major deliverables from tickets represented: YES / NO
+   □ Missing initiatives: ________________
+   □ Status: PASS / FAIL
+
+2. ✅ ACCURACY - NO EXAGGERATION (Critical)
+   □ Business impact claims match ticket priorities: YES / NO
+   □ No inflated outcomes: YES / NO
+   □ Performance claims have ticket evidence: YES / NO
+   □ List exaggerated claims: ________________
+   □ Status: PASS / FAIL
+
+3. ✅ GROUNDING CHECK (Critical)
+   □ Every business outcome tied to actual tickets: YES / NO
+   □ Customer impact claims grounded in data: YES / NO
+   □ List ungrounded claims: ________________
+   □ Status: PASS / FAIL
+
+4. ✅ METRIC VERIFICATION (Critical)
+   □ Completion stats match: ____ claimed vs {ticket_count} actual
+   □ Percentages accurate: YES / NO
+   □ List metric errors: ________________
+   □ Status: PASS / FAIL
+
+5. ✅ MISSING CRITICAL DATA (Warning)
+   □ Tickets lack business context: List IDs ________________
+   □ Strategic alignment unclear: YES / NO
+   □ Insufficient data sections: ________________
+
+=== OUTPUT FORMAT (JSON-LIKE) ===
+```
+TRUSTWORTHINESS_SCORE: [1-10]
+VALIDATION_STATUS: [PASS / FAIL / INSUFFICIENT_DATA]
+
+COMPLETENESS: [PASS/FAIL]
+Missing_Initiatives: [list or "None"]
+
+ACCURACY: [PASS/FAIL]
+Exaggerated_Claims: [list or "None"]
+
+GROUNDING: [PASS/FAIL]
+Ungrounded_Claims: [list or "None"]
+
+METRICS: [PASS/FAIL]
+Metric_Errors: [list or "None"]
+
+INSUFFICIENT_DATA_SECTIONS: [list or "None"]
+
+REGENERATION_REQUIRED: [YES/NO]
+REGENERATION_INSTRUCTIONS: [Specific fixes needed]
+
+RECOMMENDATION: [APPROVE / REGENERATE / MANUAL_REVIEW]
+```
+""",
+
+    "group_manager": """You are an AI judge performing STRICT VERIFICATION of a strategic summary.
+Your role: Ensure portfolio claims are grounded in actual team deliveries.
+
+=== ORIGINAL TICKET DATA (GROUND TRUTH) ===
+{ticket_data}
+
+=== GENERATED SUMMARY (TO BE VERIFIED) ===
+{summary_text}
+
+=== STRICT VERIFICATION PROTOCOL ===
+
+1. ✅ COMPLETENESS (Critical)
+   □ All team contributions represented: YES / NO
+   □ Cross-team work captured: YES / NO
+   □ Missing teams/initiatives: ________________
+   □ Status: PASS / FAIL
+
+2. ✅ ACCURACY - NO MISLEADING METRICS (Critical)
+   □ Velocity claims match actual completion: YES / NO
+   □ Efficiency metrics calculable from data: YES / NO
+   □ No false patterns: YES / NO
+   □ List misleading metrics: ________________
+   □ Status: PASS / FAIL
+
+3. ✅ GROUNDING CHECK (Critical)
+   □ OKR alignment claims evidenced: YES / NO
+   □ Portfolio health based on data: YES / NO
+   □ List ungrounded strategic claims: ________________
+   □ Status: PASS / FAIL
+
+4. ✅ METRIC VERIFICATION (Critical)
+   □ Portfolio statistics accurate: YES / NO
+   □ Completion rates correct: YES / NO
+   □ List metric errors: ________________
+   □ Status: PASS / FAIL
+
+5. ✅ RISK IDENTIFICATION
+   □ Blockers from tickets surfaced: YES / NO
+   □ Dependencies mentioned: YES / NO
+   □ List missing risks: ________________
+
+=== OUTPUT FORMAT (JSON-LIKE) ===
+```
+TRUSTWORTHINESS_SCORE: [1-10]
+VALIDATION_STATUS: [PASS / FAIL / INSUFFICIENT_DATA]
+
+COMPLETENESS: [PASS/FAIL]
+Missing_Content: [list or "None"]
+
+ACCURACY: [PASS/FAIL]
+Misleading_Metrics: [list or "None"]
+
+GROUNDING: [PASS/FAIL]
+Ungrounded_Claims: [list or "None"]
+
+METRICS: [PASS/FAIL]
+Metric_Errors: [list or "None"]
+
+INSUFFICIENT_DATA_SECTIONS: [list or "None"]
+
+REGENERATION_REQUIRED: [YES/NO]
+REGENERATION_INSTRUCTIONS: [Specific fixes needed]
+
+RECOMMENDATION: [APPROVE / REGENERATE / MANUAL_REVIEW]
+```
+""",
+
+    "cto": """You are an AI judge performing STRICT VERIFICATION of an executive brief.
+Your role: Ensure strategic claims are defensible for board/investor presentation.
+
+=== ORIGINAL TICKET DATA (GROUND TRUTH) ===
+{ticket_data}
+
+=== GENERATED SUMMARY (TO BE VERIFIED) ===
+{summary_text}
+
+=== STRICT VERIFICATION PROTOCOL ===
+
+1. ✅ COMPLETENESS (Critical)
+   □ Strategic initiatives captured: YES / NO
+   □ Innovation work represented: YES / NO
+   □ Missing strategic elements: ________________
+   □ Status: PASS / FAIL
+
+2. ✅ ACCURACY - BOARD-LEVEL DEFENSIBILITY (Critical)
+   □ Business impact claims have evidence: YES / NO
+   □ ROI/efficiency claims calculable: YES / NO
+   □ No unsupportable strategic value: YES / NO
+   □ List indefensible claims: ________________
+   □ Status: PASS / FAIL
+
+3. ✅ GROUNDING CHECK (Critical)
+   □ Technology strategy claims tied to work: YES / NO
+   □ Innovation claims grounded in tickets: YES / NO
+   □ List ungrounded strategic claims: ________________
+   □ Status: PASS / FAIL
+
+4. ✅ METRIC VERIFICATION (Critical)
+   □ Executive metrics accurate: YES / NO
+   □ Delivery velocity correct: YES / NO
+   □ List metric errors: ________________
+   □ Status: PASS / FAIL
+
+=== OUTPUT FORMAT (JSON-LIKE) ===
+```
+TRUSTWORTHINESS_SCORE: [1-10]
+VALIDATION_STATUS: [PASS / FAIL / INSUFFICIENT_DATA]
+
+COMPLETENESS: [PASS/FAIL]
+Missing_Strategic_Elements: [list or "None"]
+
+ACCURACY: [PASS/FAIL]
+Indefensible_Claims: [list or "None"]
+
+GROUNDING: [PASS/FAIL]
+Ungrounded_Claims: [list or "None"]
+
+METRICS: [PASS/FAIL]
+Metric_Errors: [list or "None"]
+
+INSUFFICIENT_DATA_SECTIONS: [list or "None"]
+
+REGENERATION_REQUIRED: [YES/NO]
+REGENERATION_INSTRUCTIONS: [Specific fixes needed]
+
+RECOMMENDATION: [APPROVE / REGENERATE / MANUAL_REVIEW]
+```
+"""
+}
+
+# Enhanced Persona Prompts with No-Hallucination Instructions
+NO_HALLUCINATION_INSTRUCTIONS = """
+
+⚠️ CRITICAL INSTRUCTIONS - NO HALLUCINATION POLICY:
+
+1. ONLY use information explicitly present in the ticket data provided
+2. DO NOT infer, assume, or generate technical details not in tickets
+3. If tickets lack specific information (e.g., technology used, architectural decisions):
+   - Write "[Insufficient ticket detail - not specified]" 
+   - DO NOT make educated guesses
+   - DO NOT assume common patterns
+4. If no tickets are provided, return: "No ticket data available for this period"
+5. Count tickets carefully and report EXACT numbers
+6. Copy ticket IDs exactly as provided - do not generate new IDs
+7. If you cannot verify a claim from the ticket data, omit it entirely
+
+Your summary will be verified by an AI Judge. Any fabricated content will be rejected.
+"""

@@ -167,9 +167,9 @@ initiative_name = st.text_input("Initiative / Epic Name*", value="AWS",  key="in
 st.header("👤 JIRA Details")
 # STEP 1: Use default configuration checkbox (shown FIRST)
 use_default_jira = st.checkbox(
-    "Use default Jira configuration", 
+    "Use test Jira configuration", 
     value=True if CREDENTIALS.get('jira_url') else False,
-    help="Use pre-configured Jira credentials from secrets.toml"
+    help="Use pre-configured test Jira credentials from secrets.toml"
 )
 
 # STEP 2: If NOT using defaults, show Jira type selector and inputs
@@ -375,6 +375,89 @@ if period == "Custom":
     period = f"{start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
 
 # ============================================================================
+# AI AS JUDGE CONFIGURATION
+# ============================================================================
+st.header("🔍 AI as Judge (Optional)")
+st.markdown("*Automatically validate report accuracy and trigger regeneration if issues found*")
+
+with st.expander("⚙️ Configure AI Judge & Auto-Validation", expanded=False):
+    from config import AI_JUDGE_PROMPTS, AI_JUDGE_CONFIG
+    
+    enable_judge = st.checkbox(
+        "Enable AI as Judge",
+        value=False,
+        key="enable_judge",
+        help="Use AI to verify all report information is grounded in actual Jira ticket data. Auto-regenerates if issues found (max 2 attempts)."
+    )
+    
+    if enable_judge:
+        st.info("🔄 **Auto-Validation**: Judge will automatically validate after generation and trigger regeneration if issues are found (max 2 attempts).")
+        
+        # Judge LLM Provider Selection
+        judge_llm_provider = st.selectbox(
+            "Judge LLM Provider",
+            ["Groq (Free Tier)", "OpenAI", "xAI", "Gemini", "None"],
+            key="judge_llm_provider",
+            help="Select which LLM to use for validating the summary (can be different from report LLM)"
+        )
+        
+        judge_llm_key = None
+        selected_judge_groq_model = None
+        
+        if judge_llm_provider == "Groq (Free Tier)":
+            if not CREDENTIALS.get('groq_api_key'):
+                st.error("⚠️ Groq API key not configured for judge.")
+            else:
+                with st.spinner("Loading judge models..."):
+                    judge_models = fetch_groq_models(CREDENTIALS['groq_api_key'])
+                
+                if not judge_models:
+                    st.error("❌ Could not fetch Groq models for judge.")
+                else:
+                    default_index = 0
+                    if "moonshot-ai/kimi-k2-instruct" in judge_models:
+                        default_index = judge_models.index("moonshot-ai/kimi-k2-instruct")
+                    
+                    selected_judge_groq_model = st.selectbox(
+                        "Judge Model",
+                        judge_models,
+                        index=default_index,
+                        key="judge_groq_model",
+                        help="Model for validation (can differ from report generation model)"
+                    )
+                    
+                    judge_llm_key = CREDENTIALS['groq_api_key']
+        
+        elif judge_llm_provider in ["OpenAI", "xAI", "Gemini"]:
+            judge_llm_key = st.text_input(
+                f"{judge_llm_provider} API Key (Judge)",
+                type="password",
+                key="judge_llm_key",
+                help="Separate API key for judge (can be same as report generation)"
+            )
+        
+        # Judge Prompt Configuration
+        st.subheader("📝 Judge Evaluation Criteria")
+        st.markdown("*Customize how the AI judge validates summaries. The judge will check for completeness, accuracy, and grounding in actual ticket data.*")
+        
+        # Get default judge prompt based on persona
+        persona_key = persona.lower().replace(' ', '_')
+        default_judge_prompt = AI_JUDGE_PROMPTS.get(persona_key, AI_JUDGE_PROMPTS.get('team_lead', ''))
+        
+        judge_prompt_template = st.text_area(
+            "Judge Validation Prompt",
+            value=default_judge_prompt,
+            height=400,
+            key="judge_prompt_template",
+            help="This prompt defines validation criteria. Edit to customize checks. Use {ticket_data}, {summary_text}, {ticket_count} placeholders."
+        )
+        
+        # Store derived values (widgets with keys are auto-stored by Streamlit)
+        # Only store judge_llm_key since it's conditionally derived from CREDENTIALS or text input
+        if 'judge_llm_key_value' not in st.session_state or st.session_state.get('judge_llm_key_value') != judge_llm_key:
+            st.session_state['judge_llm_key_value'] = judge_llm_key
+
+# ============================================================================
 # GENERATE REPORT
 # ============================================================================
 
@@ -410,31 +493,84 @@ if st.button("📄 Generate Report"):
                     st.warning("⚠️ No issues found matching your criteria")
                     st.stop()
             
-            # Generate report
-            with st.spinner("Generating report..."):
-                report, df, next_df = generate_report(
-                    issues, 
-                    persona.lower().replace(' ', '_'), 
-                    llm_provider, 
-                    llm_key, 
-                    initiative_name, 
-                    period, 
-                    jira_client, 
-                    spaces, 
-                    labels,
-                    groq_model=selected_groq_model,
-                    persona_prompt=persona_prompt
-                )
+            # Store raw issues for judge
+            st.session_state['raw_issues'] = issues
+            
+            # Check if AI Judge is enabled
+            enable_judge = st.session_state.get('enable_judge', False)
+            
+            # Generate report with optional validation
+            if enable_judge:
+                from jira_core import generate_report_with_validation, parse_judge_evaluation
+                from config import REGENERATION_MESSAGES
                 
-                # Store in session state
-                st.session_state['generated_report'] = report
-                st.session_state['generated_df'] = df
-                st.session_state['generated_next_df'] = next_df
-                st.session_state['generated_initiative_name'] = initiative_name
-                
-                # Check for rate limit warning in report
-                if "⚠️ Rate limit hit" in report:
-                    st.warning("Rate limit encountered. Please select a different model and try again.")
+                with st.spinner("🔄 Generating report with AI Judge validation..."):
+                    report, df, next_df, judge_evaluation, validation_passed = generate_report_with_validation(
+                        issues,
+                        persona.lower().replace(' ', '_'),
+                        llm_provider,
+                        llm_key,
+                        initiative_name,
+                        period,
+                        jira_client,
+                        spaces,
+                        labels,
+                        enable_judge=True,
+                        judge_llm_provider=st.session_state.get('judge_llm_provider'),
+                        judge_api_key=st.session_state.get('judge_llm_key_value'),
+                        judge_model=st.session_state.get('judge_groq_model'),
+                        groq_model=selected_groq_model,
+                        persona_prompt=persona_prompt,
+                        judge_prompt_template=st.session_state.get('judge_prompt_template')
+                    )
+                    
+                    # Store results
+                    st.session_state['generated_report'] = report
+                    st.session_state['generated_df'] = df
+                    st.session_state['generated_next_df'] = next_df
+                    st.session_state['generated_initiative_name'] = initiative_name
+                    st.session_state['judge_evaluation'] = judge_evaluation
+                    st.session_state['validation_passed'] = validation_passed
+                    
+                    # Show validation result
+                    if judge_evaluation:
+                        validation_result = parse_judge_evaluation(judge_evaluation)
+                        
+                        if validation_passed:
+                            st.success(REGENERATION_MESSAGES['validation_passed'])
+                            st.info(f"✅ Trustworthiness Score: {validation_result['trustworthiness_score']}/10")
+                        else:
+                            if validation_result['validation_status'] == 'INSUFFICIENT_DATA':
+                                st.warning(REGENERATION_MESSAGES['insufficient_data'])
+                            else:
+                                st.warning(REGENERATION_MESSAGES['max_attempts_reached'])
+                            st.warning(f"⚠️ Trustworthiness Score: {validation_result['trustworthiness_score']}/10")
+            else:
+                # Regular generation without judge
+                with st.spinner("Generating report..."):
+                    report, df, next_df = generate_report(
+                        issues, 
+                        persona.lower().replace(' ', '_'), 
+                        llm_provider, 
+                        llm_key, 
+                        initiative_name, 
+                        period, 
+                        jira_client, 
+                        spaces, 
+                        labels,
+                        groq_model=selected_groq_model,
+                        persona_prompt=persona_prompt
+                    )
+                    
+                    # Store in session state
+                    st.session_state['generated_report'] = report
+                    st.session_state['generated_df'] = df
+                    st.session_state['generated_next_df'] = next_df
+                    st.session_state['generated_initiative_name'] = initiative_name
+            
+            # Check for rate limit warning in report
+            if "⚠️ Rate limit hit" in report:
+                st.warning("Rate limit encountered. Please select a different model and try again.")
                     
         except Exception as e:
             st.error(f"❌ Error: {e}")
@@ -445,7 +581,59 @@ if st.button("📄 Generate Report"):
 
 if 'generated_report' in st.session_state and st.session_state.generated_report:
     st.markdown("---")
-    st.text_area("Generated Report", st.session_state.generated_report, height=600)
+    st.subheader("📄 Generated Report")
+    st.text_area("Report Content", st.session_state.generated_report, height=600, key="report_display")
+    
+    # Display AI Judge Evaluation if available
+    if 'judge_evaluation' in st.session_state and st.session_state.judge_evaluation:
+        st.markdown("---")
+        st.subheader("🔍 AI Judge Verification Report")
+        
+        from jira_core import parse_judge_evaluation
+        validation_result = parse_judge_evaluation(st.session_state.judge_evaluation)
+        
+        # Display trust score with color coding
+        score = validation_result['trustworthiness_score']
+        if score >= 8:
+            st.success(f"✅ **Trustworthiness Score: {score}/10** - High Confidence")
+        elif score >= 6:
+            st.warning(f"⚠️ **Trustworthiness Score: {score}/10** - Medium Confidence")
+        else:
+            st.error(f"❌ **Trustworthiness Score: {score}/10** - Low Confidence - Review Required")
+        
+        # Display validation status
+        status = validation_result['validation_status']
+        recommendation = validation_result['recommendation']
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if status == 'PASS':
+                st.success(f"**Validation Status:** {status}")
+            elif status == 'INSUFFICIENT_DATA':
+                st.warning(f"**Validation Status:** {status}")
+            else:
+                st.error(f"**Validation Status:** {status}")
+        
+        with col2:
+            if recommendation == 'APPROVE':
+                st.success(f"**Recommendation:** {recommendation}")
+            elif recommendation == 'REGENERATE':
+                st.warning(f"**Recommendation:** {recommendation}")
+            else:
+                st.info(f"**Recommendation:** {recommendation}")
+        
+        # Display full judge evaluation
+        with st.expander("📋 View Full Judge Evaluation", expanded=False):
+            st.text_area(
+                "Detailed Verification Report",
+                st.session_state.judge_evaluation,
+                height=500,
+                key="judge_evaluation_display",
+                help="Complete AI Judge analysis including completeness checks, accuracy verification, and grounding validation"
+            )
+    
+    st.markdown("---")
+    st.subheader("📥 Export Options")
     
     # Export buttons
     col1, col2 = st.columns(2)

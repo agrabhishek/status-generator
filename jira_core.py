@@ -546,3 +546,210 @@ Overdue: {overdue_count}
 """
     
     return report, df, next_df
+
+
+def extract_ticket_data_for_judge(issues, persona='team_lead'):
+    """
+    Extract structured ticket data for AI judge verification.
+    
+    REQUIREMENT: AI Judge - Provide raw data for verification
+    Returns formatted ticket list for judge to compare against summary
+    
+    Args:
+        issues: List of Jira issues
+        persona: Persona type to determine detail level
+    
+    Returns:
+        Formatted string of ticket data
+    """
+    if not issues:
+        return "No tickets data available"
+    
+    ticket_lines = []
+    
+    for issue in issues:
+        fields = issue.get('fields', {})
+        key = issue.get('key')
+        summary = fields.get('summary', 'N/A')
+        status = fields.get('status', {}).get('name', 'N/A') if fields.get('status') else 'N/A'
+        assignee = fields.get('assignee', {}).get('displayName', 'Unassigned') if fields.get('assignee') else 'Unassigned'
+        priority = fields.get('priority', {}).get('name', 'N/A') if fields.get('priority') else 'N/A'
+        
+        if persona in ['team_lead']:
+            # Detailed view for team lead
+            created = fields.get('created', 'N/A')
+            resolved = fields.get('resolutiondate', 'N/A')
+            description = fields.get('description', 'No description')[:200] if fields.get('description') else 'No description'
+            subtasks = fields.get('subtasks', [])
+            subtask_keys = ', '.join([s.get('key', '') for s in subtasks]) if subtasks else 'None'
+            
+            ticket_lines.append(
+                f"- {key}: {summary}\n"
+                f"  Status: {status} | Assignee: {assignee} | Priority: {priority}\n"
+                f"  Created: {created} | Resolved: {resolved}\n"
+                f"  Description: {description}\n"
+                f"  Subtasks: {subtask_keys}"
+            )
+        else:
+            # Simplified view for higher personas
+            ticket_lines.append(
+                f"- {key}: {summary} | Status: {status} | Priority: {priority} | Assignee: {assignee}"
+            )
+    
+    # Add summary statistics
+    total = len(issues)
+    completed = len([i for i in issues if i.get('fields', {}).get('status', {}).get('name') == 'Done'])
+    
+    header = f"TICKET INVENTORY ({total} total, {completed} completed):\n" + "="*50 + "\n\n"
+    
+    return header + "\n\n".join(ticket_lines)
+
+
+def parse_judge_evaluation(judge_response):
+    """
+    Parse AI judge response to extract validation status and regeneration needs.
+    
+    Args:
+        judge_response: Raw text response from judge LLM
+    
+    Returns:
+        dict with parsed validation results
+    """
+    result = {
+        'validation_status': 'UNKNOWN',
+        'regeneration_required': False,
+        'regeneration_instructions': '',
+        'trustworthiness_score': 0,
+        'recommendation': 'MANUAL_REVIEW'
+    }
+    
+    # Parse validation status
+    if 'VALIDATION_STATUS: PASS' in judge_response:
+        result['validation_status'] = 'PASS'
+    elif 'VALIDATION_STATUS: FAIL' in judge_response:
+        result['validation_status'] = 'FAIL'
+    elif 'VALIDATION_STATUS: INSUFFICIENT_DATA' in judge_response:
+        result['validation_status'] = 'INSUFFICIENT_DATA'
+    
+    # Parse regeneration requirement
+    if 'REGENERATION_REQUIRED: YES' in judge_response:
+        result['regeneration_required'] = True
+        
+        # Extract regeneration instructions
+        import re
+        instructions_match = re.search(r'REGENERATION_INSTRUCTIONS: (.*?)(?:\n|$)', judge_response, re.DOTALL)
+        if instructions_match:
+            result['regeneration_instructions'] = instructions_match.group(1).strip()
+    
+    # Parse trustworthiness score
+    import re
+    score_match = re.search(r'TRUSTWORTHINESS_SCORE: (\d+)', judge_response)
+    if score_match:
+        result['trustworthiness_score'] = int(score_match.group(1))
+    
+    # Parse recommendation
+    if 'RECOMMENDATION: APPROVE' in judge_response:
+        result['recommendation'] = 'APPROVE'
+    elif 'RECOMMENDATION: REGENERATE' in judge_response:
+        result['recommendation'] = 'REGENERATE'
+        result['regeneration_required'] = True
+    elif 'RECOMMENDATION: MANUAL_REVIEW' in judge_response:
+        result['recommendation'] = 'MANUAL_REVIEW'
+    
+    return result
+
+
+def generate_report_with_validation(issues, persona, llm_provider, api_key, initiative_name, 
+                                     current_period, jira_client, spaces, labels,
+                                     enable_judge=False, judge_llm_provider=None, 
+                                     judge_api_key=None, judge_model=None,
+                                     groq_model=None, persona_prompt=None, judge_prompt_template=None):
+    """
+    Generate report with automatic AI judge validation and regeneration loop.
+    
+    REQUIREMENT: Auto-validation with regeneration (max 2 attempts)
+    
+    Args:
+        ... (same as generate_report)
+        enable_judge: Enable AI judge validation
+        judge_llm_provider: LLM provider for judge
+        judge_api_key: API key for judge
+        judge_model: Model for judge (Groq)
+        judge_prompt_template: Custom judge prompt template
+    
+    Returns:
+        tuple: (report, df, next_df, judge_evaluation, validation_passed)
+    """
+    from config import AI_JUDGE_CONFIG, AI_JUDGE_PROMPTS, NO_HALLUCINATION_INSTRUCTIONS, REGENERATION_MESSAGES
+    from llm_integrations import get_llm_summary
+    
+    max_attempts = AI_JUDGE_CONFIG['max_regeneration_attempts']
+    attempt = 0
+    validation_passed = False
+    judge_evaluation = None
+    regeneration_feedback = ""
+    
+    while attempt < max_attempts:
+        attempt += 1
+        
+        # Generate report (add no-hallucination instructions to persona prompt)
+        if attempt > 1 and regeneration_feedback:
+            # Add regeneration instructions to prompt
+            enhanced_persona_prompt = f"{persona_prompt}\n\n{NO_HALLUCINATION_INSTRUCTIONS}\n\nPREVIOUS ISSUES TO FIX:\n{regeneration_feedback}"
+        else:
+            enhanced_persona_prompt = f"{persona_prompt}\n\n{NO_HALLUCINATION_INSTRUCTIONS}"
+        
+        # Generate report
+        report, df, next_df = generate_report(
+            issues, persona, llm_provider, api_key, initiative_name,
+            current_period, jira_client, spaces, labels,
+            groq_model=groq_model, persona_prompt=enhanced_persona_prompt
+        )
+        
+        # If judge disabled, return immediately
+        if not enable_judge or not judge_llm_provider or judge_llm_provider == "None":
+            return report, df, next_df, None, True
+        
+        # Run AI judge validation
+        ticket_data = extract_ticket_data_for_judge(issues, persona)
+        ticket_count = len(issues)
+        
+        # Get judge prompt
+        persona_key = persona.lower().replace(' ', '_')
+        if judge_prompt_template:
+            judge_prompt = judge_prompt_template
+        else:
+            judge_prompt = AI_JUDGE_PROMPTS.get(persona_key, AI_JUDGE_PROMPTS['team_lead'])
+        
+        # Format judge prompt
+        formatted_judge_prompt = judge_prompt.format(
+            ticket_data=ticket_data,
+            summary_text=report,
+            ticket_count=ticket_count
+        )
+        
+        # Call judge
+        judge_evaluation = get_llm_summary(
+            judge_llm_provider,
+            judge_api_key,
+            formatted_judge_prompt,
+            groq_model=judge_model
+        )
+        
+        # Parse judge response
+        validation_result = parse_judge_evaluation(judge_evaluation)
+        
+        # Check if validation passed
+        if validation_result['validation_status'] == 'PASS' or validation_result['recommendation'] == 'APPROVE':
+            validation_passed = True
+            break
+        
+        # Check if regeneration needed
+        if not validation_result['regeneration_required'] or attempt >= max_attempts:
+            # No regeneration or max attempts reached
+            break
+        
+        # Prepare for regeneration
+        regeneration_feedback = validation_result['regeneration_instructions']
+    
+    return report, df, next_df, judge_evaluation, validation_passed
